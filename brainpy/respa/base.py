@@ -1,6 +1,10 @@
 import brainpy.dyn as dyn
 from brainpy.modes import Mode, TrainingMode, BatchingMode, normal
 from typing import Dict, Union, Sequence, Callable
+import jax.tree_util
+from mpi4py import MPI
+mpi_size = MPI.COMM_WORLD.Get_size()
+mpi_rank = MPI.COMM_WORLD.Get_rank()
 class BaseNeuron:
 	pops = []
 	pop_dist = []
@@ -9,9 +13,10 @@ class BaseNeuron:
 		self.kwargs = kwargs
 		self.shape = shape
 		self.model_class = None
+		self.lowref = None
 		self.pid = None
 		self.pops.append(self)
-  
+	
 	def __getitem__(self, index):
 		return (self, index)
 
@@ -19,6 +24,8 @@ class BaseNeuron:
 		return self.lowref.__getattribute__(__name)
 
 	def build(self): #TODO check current pid
+		if self.lowref is not None:
+			return self.lowref
 		if not self.model_class:
 			raise Exception("model_class should not be None")
 		self.lowref = self.model_class(self.shape, *self.args, **self.kwargs)
@@ -32,13 +39,16 @@ class BaseSynapse:
 		self.args = args
 		self.kwargs = kwargs
 		self.model_class = None
+		self.lowref = None
 		self.syns.append(self)
-  
+	
 	def __getattr__(self, __name: str):
 		return self.lowref.__getattribute__(__name)
 
 	def build(self):
 		# assert self.pre.lowref is not None and self.post.lowref is not None
+		if self.lowref is not None:
+			return self.lowref
 		if not self.model_class:
 			raise Exception("model_class should not be None")
 		if isinstance(self.pre, tuple):
@@ -53,9 +63,9 @@ class BaseSynapse:
 		else:
 			post = self.post.lowref
 			post_pid = self.post.pid
-		if pre_pid == post_pid and post_pid != None or post_pid is None and pre_pid is None: #TODO check current pid
+		if pre_pid == post_pid and pre_pid == mpi_rank:
 			self.lowref = self.model_class(pre, post, *self.args, **self.kwargs)
-		else:
+		elif pre_pid == mpi_rank or post_pid == mpi_rank:
 			self.lowref = self.model_class_remote(pre_pid, pre, pre_pid, post, *self.args, **self.kwargs)
 		return self.lowref
 
@@ -71,39 +81,65 @@ class Exponential(BaseSynapse):
 		self.model_class_remote = None
 
 class Network:
-  def __init__(self, *ds_tuple, name: str = None, mode: Mode = normal, **ds_dict):
-    self.lowref = dyn.Network(*map(lambda x: x.lowref, ds_tuple), name=name, mode=mode, **ds_dict)
+	def __init__(self, *ds_tuple, name: str = None, mode: Mode = normal, **ds_dict):
+		self.ds_tuple = ds_tuple
+		self.ds_dict = ds_dict
+		self.lowref = dyn.Network((), name=name, mode=mode)
   
-  def build(self):
-    for pop in BaseNeuron.pops:
-      pop.build()
-    for syn in BaseSynapse.syns:
-      syn.build()
-    self.lowref.register_implicit_nodes(*map(lambda x: x.lowref, BaseNeuron.pops))
-    self.lowref.register_implicit_nodes(*map(lambda x: x.lowref, BaseSynapse.syns))
-  
-  def update(self, *args, **kwargs):
-    self.lowref.update(*args, **kwargs)
+	def __getattr__(self, __name: str):
+		return self.lowref.__getattribute__(__name)
+	
+	def build_all_population_synapse(self):
+		for pop in BaseNeuron.pops:
+			pop.build()
+		for syn in BaseSynapse.syns:
+			syn.build()
+		self.lowref.register_implicit_nodes(*map(lambda x: x.lowref, BaseNeuron.pops))
+		self.lowref.register_implicit_nodes(*map(lambda x: x.lowref, BaseSynapse.syns))
+
+	def build(self):
+		self.pops_ = []
+		self.syns_ = []
+		def reg_pop_syn(v):
+			if isinstance(v, BaseNeuron):
+				self.pops_.append(v)
+			elif isinstance(v, BaseSynapse):
+				self.syns_.append(v)
+		jax.tree_util.tree_map(reg_pop_syn, self.__dict__)
+		def simple_split(pops_):
+			res = [[] for i in range(mpi_size)]
+			avg = len(pops_) // mpi_size
+			for i in range(mpi_size):
+				res[i].extend(pops_[i*avg:i*avg+avg])
+			res[-1].extend(pops_[avg*mpi_size:])
+			return res
+		self.pops_split = simple_split(self.pops_)
+		for i in range(mpi_size):
+			for __pops in self.pops_split[i]:
+				__pops.pid = i
+		for node in self.pops_split[mpi_rank]:
+			node.build()
+			self.lowref.register_implicit_nodes(node.lowref)
+		for node in self.syns_:
+			if node.build() is not None:
+				self.lowref.register_implicit_nodes(node.lowref)
+	
+	def update(self, *args, **kwargs):
+		self.lowref.update(*args, **kwargs)
 
 class DSRunner:
-	def __init__(self):
-		pass
-	
 	def __init__(
-      self,
-      target: Network,
-      # inputs for target variables
-      inputs: Sequence = (),
-      fun_inputs: Callable = None,
-      # extra info
-      dt: float = None,
-      t0: Union[float, int] = 0.,
-      **kwargs
-  ):
-		inputs_trans = inputs
-		# for i in inputs:
-		# 	inputs_trans.append((i[0].lowref.input, i[1]))
-		self.lowref = dyn.DSRunner(target=target.lowref, inputs=inputs_trans, fun_inputs=fun_inputs, dt=dt, t0=t0, **kwargs)
+			self,
+			target: Network,
+			# inputs for target variables
+			inputs: Sequence = (),
+			fun_inputs: Callable = None,
+			# extra info
+			dt: float = None,
+			t0: Union[float, int] = 0.,
+			**kwargs
+	):
+		self.lowref = dyn.DSRunner(target=target.lowref, inputs=inputs, fun_inputs=fun_inputs, dt=dt, t0=t0, **kwargs)
 
 	def __getattr__(self, __name: str):
 		return self.lowref.__getattribute__(__name)
