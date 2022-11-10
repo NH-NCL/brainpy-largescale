@@ -55,6 +55,7 @@ from . import (
   datasets,  # methods for generating data
   inputs,  # methods for generating input currents
   algorithms,  # online or offline training algorithms
+  respa,
 )
 
 # numerical integrators
