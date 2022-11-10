@@ -192,6 +192,7 @@ def raster_plot(ts,
     plt.title(title)
 
   if show:
+    plt.savefig('result.png')
     plt.show()
 
 
