@@ -181,6 +181,9 @@ class DynamicalSystem(Base):
           self.local_delay_vars[identifier] = delay
         elif delay.num_delay_step - 1 < max_delay_step:
           self.global_delay_data[identifier][0].reset(delay_target, max_delay_step, initial_delay_data)
+          self.local_delay_vars[identifier] = delay#修改 对于global中已存在的delay，在local_delay_vars中也注册上
+        else:
+          self.local_delay_vars[identifier] = delay#修改 对于global中已存在的delay，在local_delay_vars中也注册上
     else:
       if identifier not in self.global_delay_data:
         self.global_delay_data[identifier] = (None, delay_target)
@@ -542,6 +545,7 @@ class Network(Container):
   def __init__(
       self,
       *ds_tuple,
+      comm=None,
       name: str = None,
       mode: Mode = normal,
       **ds_dict
@@ -550,6 +554,11 @@ class Network(Container):
                                   name=name,
                                   mode=mode,
                                   **ds_dict)
+    self.comm = comm
+    if self.comm == None:
+      self.rank = None
+    else:
+      self.rank = self.comm.Get_rank()
 
   def update(self, *args, **kwargs):
     """Step function of a network.
@@ -603,6 +612,81 @@ class Network(Container):
     # reset delays
     self.reset_local_delays(nodes)
 
+  def update_local_delays(self, nodes: Union[Sequence, Dict] = None):
+    """Update local delay variables.
+
+    This function should be called after updating neuron groups or delay sources.
+    For example, in a network model,
+
+
+    Parameters
+    ----------
+    nodes: sequence, dict
+      The nodes to update their delay variables.
+    """
+    # update delays
+    if nodes is None:
+      nodes = tuple(self.nodes(level=1, include_self=False).subset(DynamicalSystem).unique().values())
+    elif isinstance(nodes, DynamicalSystem):
+      nodes = (nodes, )
+    elif isinstance(nodes, dict):
+      nodes = tuple(nodes.values())
+    if not isinstance(nodes, (tuple, list)):
+      raise ValueError('Please provide nodes as a list/tuple/dict of DynamicalSystem.')
+    for node in nodes:
+      #MPI~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      if hasattr(node, 'comm'):
+        for name in node.local_delay_vars:
+          if self.rank == node.source_rank:
+            self.comm.send(len(node.pre.spike), dest=node.target_rank, tag=3)
+            self.comm.Send(node.pre.spike.to_numpy(), dest=node.target_rank, tag=4)
+          elif self.rank == node.target_rank:
+            delay = self.global_delay_data[name][0]
+            pre_len = self.comm.recv(source=node.source_rank, tag=3)
+            data = np.empty(pre_len, dtype=np.bool_)
+            self.comm.Recv(data, source=node.source_rank, tag=4)
+            target = bm.Variable(data)
+            delay.update(target.value)
+      else:
+        for name in node.local_delay_vars:
+          delay = self.global_delay_data[name][0]
+          target = self.global_delay_data[name][1]
+          delay.update(target.value)
+      #MPI~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+  def reset_local_delays(self, nodes: Union[Sequence, Dict] = None):
+    """Reset local delay variables.
+
+    Parameters
+    ----------
+    nodes: sequence, dict
+      The nodes to Reset their delay variables.
+    """
+    # reset delays
+    if nodes is None:
+      nodes = self.nodes(level=1, include_self=False).subset(DynamicalSystem).unique().values()
+    elif isinstance(nodes, dict):
+      nodes = nodes.values()
+    for node in nodes:
+      #MPI~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      if hasattr(node, 'comm'):
+        for name in node.local_delay_vars:
+          if self.rank == node.source_rank:
+            self.comm.send(len(node.pre.spike), dest=node.target_rank, tag=5)
+            self.comm.Send(node.pre.spike.to_numpy(), dest=node.target_rank, tag=6)
+          elif self.rank == node.target_rank:
+            delay = self.global_delay_data[name][0]
+            pre_len = self.comm.recv(source=node.source_rank, tag=5)
+            data = np.empty(pre_len, dtype=np.bool_)
+            self.comm.Recv(data, source=node.source_rank, tag=6)
+            target = bm.Variable(data)
+            delay.reset(target.value)
+      else:
+        for name in node.local_delay_vars:
+          delay = self.global_delay_data[name][0]
+          target = self.global_delay_data[name][1]
+          delay.reset(target.value)
+      #MPI~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 class System(Network):
   pass
