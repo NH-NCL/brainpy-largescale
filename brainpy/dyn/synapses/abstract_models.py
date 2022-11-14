@@ -15,6 +15,7 @@ from brainpy.modes import Mode, BatchingMode, normal, NormalMode, check_mode
 from brainpy.types import Array
 from ..synouts import CUBA, MgBlock
 import numpy as np
+from mpi4py import MPI
 
 
 __all__ = [
@@ -450,12 +451,12 @@ class RemoteExponential(TwoEndConn):
 
   def __init__(
       self,
+      source_rank,
       pre: NeuGroup,
+      target_rank,
       post: NeuGroup,
       conn: Union[TwoEndConnector, Array, Dict[str, Array]],
-      source_rank,
-      target_rank,
-      comm,
+      comm=MPI.COMM_WORLD,
       output: SynOut = CUBA(),
       stp: Optional[SynSTP] = None,
       comp_method: str = 'sparse',
@@ -487,8 +488,6 @@ class RemoteExponential(TwoEndConn):
 
     # connections and weights
     self.g_max, self.conn_mask = self.init_weights(g_max, comp_method, sparse_data='csr')
-    
-    #MPI~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     self.comm = comm
     self.source_rank = source_rank
     self.target_rank = target_rank
@@ -509,7 +508,6 @@ class RemoteExponential(TwoEndConn):
       self.delay_step = self.register_delay(f"{self.pre_name}.spike", delay_step, self.pre_spike)
       self.g = variable_(bm.zeros, self.post.num, mode)
       self.integral = odeint(lambda g, t: -g / self.tau, method=method)
-    #MPI~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
   def reset_state(self, batch_size=None):
     self.g.value = variable_(bm.zeros, self.post.num, batch_size)
@@ -517,7 +515,6 @@ class RemoteExponential(TwoEndConn):
     if self.stp is not None: self.stp.reset_state(batch_size)
 
   def update(self, tdi, pre_spike=None):
-    #MPI~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     if self.rank == self.target_rank:
       t, dt = tdi['t'], tdi['dt']
 
@@ -558,7 +555,6 @@ class RemoteExponential(TwoEndConn):
       return self.output(self.g)
     elif self.rank == self.source_rank:
       pass
-    #MPI~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 class DualExponential(TwoEndConn):

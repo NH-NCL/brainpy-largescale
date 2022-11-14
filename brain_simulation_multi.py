@@ -4,17 +4,13 @@ import brainpy as bp
 import brainpy.math as bm
 from brainpy.math.jaxarray import ndarray, Variable, JaxArray
 import jax.numpy as jnp
-#MPI~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-comm = MPI.COMM_WORLD
-#MPI~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+from brainpy import tools
 bp.math.set_platform('cpu')
 
 
 class EINet_V1(bp.dyn.Network):
-  #MPI~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  def __init__(self, scale=1.0, method='exp_auto', comm=None):
-  #MPI~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    super(EINet_V1, self).__init__(comm=comm)
+  def __init__(self, scale=1.0, method='exp_auto'):
+    super(EINet_V1, self).__init__()
 
     # network size
     num_exc = int(3200 * scale)
@@ -27,7 +23,6 @@ class EINet_V1(bp.dyn.Network):
     we = 0.6 / scale  # excitatory synaptic weight (voltage)
     wi = 6.7 / scale  # inhibitory synaptic weight
     
-    #MPI~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     if self.rank == 0:
       self.E1 = bp.neurons.LIF(num_exc, **pars, method=method)
       self.I1 = bp.neurons.LIF(num_inh, **pars, method=method)
@@ -39,23 +34,25 @@ class EINet_V1(bp.dyn.Network):
                                        delay_step=1)
       self.I2 = bp.neurons.LIF(0)
       self.I2.size = num_inh
+      self.I2.num = tools.size2num(self.I2.size)
     elif self.rank == 1:
       self.E1 = bp.neurons.LIF(0)
       self.E1.size = num_exc
+      self.E1.num = tools.size2num(self.E1.size)
       self.I1 = bp.neurons.LIF(0)
       self.I1.size = num_inh
+      self.I1.num = tools.size2num(self.I1.size)
       self.I2 = bp.neurons.LIF(num_inh, **pars, method=method)
-    self.remoteE12I2 = bp.synapses.RemoteExponential(self.E1, self.I2, 
+    self.remoteE12I2 = bp.synapses.RemoteExponential(0, self.E1, 1, self.I2, 
                                                     bp.conn.FixedProb(0.02,seed=1), 
                                                       output=bp.synouts.COBA(E=0.), g_max=we,
                                                       tau=5., 
                                                       method=method,
-                                                      delay_step=1,
-                                                      source_rank=0, target_rank=1, comm=self.comm)
-    #MPI~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                                                      delay_step=1
+                                                      )
 
 def run_model_v1():
-  net = EINet_V1(scale=1., method='exp_auto', comm=comm)
+  net = EINet_V1(scale=1., method='exp_auto')
   runner = bp.dyn.DSRunner(
     net,
     monitors={'I2.spike': net.I2.spike},
@@ -64,7 +61,7 @@ def run_model_v1():
   )
   runner.run(10.)
 
-  if comm.Get_rank() == 1:
+  if net.rank == 1:
     # visualization
     bp.visualize.raster_plot(runner.mon.ts, runner.mon['I2.spike'], show=True)
 
