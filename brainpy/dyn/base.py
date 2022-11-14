@@ -20,6 +20,7 @@ from brainpy.integrators import odeint, sdeint
 from brainpy.modes import Mode, TrainingMode, BatchingMode, normal
 from brainpy.tools.others import to_size, size2num, numba_jit, DotDict
 from brainpy.types import Array, Shape
+from mpi4py import MPI
 
 __all__ = [
   # general class
@@ -545,7 +546,7 @@ class Network(Container):
   def __init__(
       self,
       *ds_tuple,
-      comm=None,
+      comm=MPI.COMM_WORLD,
       name: str = None,
       mode: Mode = normal,
       **ds_dict
@@ -634,7 +635,6 @@ class Network(Container):
     if not isinstance(nodes, (tuple, list)):
       raise ValueError('Please provide nodes as a list/tuple/dict of DynamicalSystem.')
     for node in nodes:
-      #MPI~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       if hasattr(node, 'comm'):
         for name in node.local_delay_vars:
           if self.rank == node.source_rank:
@@ -652,7 +652,6 @@ class Network(Container):
           delay = self.global_delay_data[name][0]
           target = self.global_delay_data[name][1]
           delay.update(target.value)
-      #MPI~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
   def reset_local_delays(self, nodes: Union[Sequence, Dict] = None):
     """Reset local delay variables.
@@ -668,7 +667,6 @@ class Network(Container):
     elif isinstance(nodes, dict):
       nodes = nodes.values()
     for node in nodes:
-      #MPI~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       if hasattr(node, 'comm'):
         for name in node.local_delay_vars:
           if self.rank == node.source_rank:
@@ -686,7 +684,6 @@ class Network(Container):
           delay = self.global_delay_data[name][0]
           target = self.global_delay_data[name][1]
           delay.reset(target.value)
-      #MPI~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 class System(Network):
   pass
