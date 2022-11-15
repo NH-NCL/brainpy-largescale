@@ -636,7 +636,7 @@ class Network(Container):
       raise ValueError('Please provide nodes as a list/tuple/dict of DynamicalSystem.')
     for node in nodes:
       if hasattr(node, 'comm'):
-        for name in node.local_delay_vars:
+        for name in node.global_delay_data:
           if self.rank == node.source_rank:
             self.comm.send(len(node.pre.spike), dest=node.target_rank, tag=3)
             self.comm.Send(node.pre.spike.to_numpy(), dest=node.target_rank, tag=4)
@@ -646,7 +646,10 @@ class Network(Container):
             data = np.empty(pre_len, dtype=np.bool_)
             self.comm.Recv(data, source=node.source_rank, tag=4)
             target = bm.Variable(data)
-            delay.update(target.value)
+            if delay == None:
+              self.global_delay_data[name] = (None, target)
+            else:
+              delay.update(target.value)
       else:
         for name in node.local_delay_vars:
           delay = self.global_delay_data[name][0]
@@ -668,7 +671,7 @@ class Network(Container):
       nodes = nodes.values()
     for node in nodes:
       if hasattr(node, 'comm'):
-        for name in node.local_delay_vars:
+        for name in node.global_delay_data:
           if self.rank == node.source_rank:
             self.comm.send(len(node.pre.spike), dest=node.target_rank, tag=5)
             self.comm.Send(node.pre.spike.to_numpy(), dest=node.target_rank, tag=6)
@@ -678,7 +681,10 @@ class Network(Container):
             data = np.empty(pre_len, dtype=np.bool_)
             self.comm.Recv(data, source=node.source_rank, tag=6)
             target = bm.Variable(data)
-            delay.reset(target.value)
+            if delay == None:
+              self.global_delay_data[name] = (None, target)
+            else:
+              delay.reset(target.value)
       else:
         for name in node.local_delay_vars:
           delay = self.global_delay_data[name][0]
