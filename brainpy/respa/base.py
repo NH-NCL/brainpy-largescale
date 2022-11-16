@@ -3,6 +3,7 @@ from brainpy.modes import Mode, TrainingMode, BatchingMode, normal
 from typing import Dict, Union, Sequence, Callable
 import jax.tree_util
 from mpi4py import MPI
+from brainpy import tools
 mpi_size = MPI.COMM_WORLD.Get_size()
 mpi_rank = MPI.COMM_WORLD.Get_rank()
 
@@ -56,24 +57,52 @@ class BaseSynapse:
       return self.lowref
     if not self.model_class:
       raise Exception("model_class should not be None")
+
     if isinstance(self.pre, tuple):
-      pre = self.pre[0].lowref[self.pre[1]]
       pre_pid = self.pre[0].pid
+      pre_shape = self.pre[0].shape
+      pre_slice = self.pre[1]
+      if pre_pid == mpi_rank:
+        pre = self.pre[0].lowref[self.pre[1]]
     else:
-      pre = self.pre.lowref
       pre_pid = self.pre.pid
+      pre_shape = self.pre.shape
+      pre_slice = None
+      if pre_pid == mpi_rank:
+        pre = self.pre.lowref
+
     if isinstance(self.post, tuple):
-      post = self.post[0].lowref[self.post[1]]
       post_pid = self.post[0].pid
+      post_shape = self.post[0].shape
+      post_slice = self.post[1]
+      if post_pid == mpi_rank:
+        post = self.post[0].lowref[self.post[1]]
     else:
-      post = self.post.lowref
       post_pid = self.post.pid
+      post_shape = self.post.shape
+      post_slice = None
+      if post_pid == mpi_rank:
+        post = self.post.lowref
+
     if pre_pid == post_pid and pre_pid == mpi_rank:
       self.lowref = self.model_class(
           pre, post, *self.args, **self.kwargs)
-    elif pre_pid == mpi_rank or post_pid == mpi_rank:
+    elif pre_pid == mpi_rank:
+      tmp_ = dyn.LIF(0)
+      tmp_.size = post_shape
+      tmp_.num = tools.size2num(tmp_.size)
+      if post_slice is not None:
+        tmp_ = tmp_[post_slice]
       self.lowref = self.model_class_remote(
-          pre_pid, pre, pre_pid, post, *self.args, **self.kwargs)
+          pre_pid, pre, post_pid, tmp_, *self.args, **self.kwargs)
+    elif post_pid == mpi_rank:
+      tmp_ = dyn.LIF(0)
+      tmp_.size = pre_shape
+      tmp_.num = tools.size2num(tmp_.size)
+      if pre_slice is not None:
+        tmp_ = tmp_[pre_slice]
+      self.lowref = self.model_class_remote(
+          pre_pid, tmp_, post_pid, post, *self.args, **self.kwargs)
     return self.lowref
 
 
@@ -87,7 +116,7 @@ class Exponential(BaseSynapse):
   def __init__(self, pre, post, *args, **kwargs):
     super().__init__(pre, post, *args, **kwargs)
     self.model_class = dyn.synapses.Exponential
-    self.model_class_remote = None
+    self.model_class_remote = dyn.synapses.RemoteExponential
 
 
 class Network:
@@ -145,7 +174,7 @@ class Network:
 class DSRunner:
   def __init__(
       self,
-      target: Network,
+      target: Union[dyn.DynamicalSystem, Network],
       # inputs for target variables
       inputs: Sequence = (),
       fun_inputs: Callable = None,
@@ -154,8 +183,12 @@ class DSRunner:
       t0: Union[float, int] = 0.,
       **kwargs
   ):
-    self.lowref = dyn.DSRunner(
-        target=target.lowref, inputs=inputs, fun_inputs=fun_inputs, dt=dt, t0=t0, **kwargs)
+    if isinstance(target, Network):
+      self.lowref = dyn.DSRunner(
+          target=target.lowref, inputs=inputs, fun_inputs=fun_inputs, dt=dt, t0=t0, **kwargs)
+    elif isinstance(target, dyn.DynamicalSystem):
+      self.lowref = dyn.DSRunner(
+          target=target, inputs=inputs, fun_inputs=fun_inputs, dt=dt, t0=t0, **kwargs)
 
   def __getattr__(self, __name: str):
     return self.lowref.__getattribute__(__name)
