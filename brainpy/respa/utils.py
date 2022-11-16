@@ -1,8 +1,19 @@
-from typing import List, Tuple, Union
+from typing import Sequence
 from .base import BaseNeuron
 
 
-def input_transform(pops: List[Tuple[BaseNeuron, float]]):
+def input_transform(pops: Sequence):
+  """Select BaseNeurons which locate on current process and return its input.
+
+  Parameters
+  ----------
+  pops : Sequence
+
+  Returns
+  -------
+  The inputs for the target DynamicalSystem. It should be the format
+    of `[(target, value, [type, operation])]
+  """
   if len(pops) > 0 and not isinstance(pops[0], (list, tuple)):
     pops = [pops]
   input_trans = []
@@ -15,7 +26,20 @@ def input_transform(pops: List[Tuple[BaseNeuron, float]]):
   return input_trans
 
 
-def monitor_transform(pops: Union[List[BaseNeuron], Tuple[BaseNeuron]], attr: str = 'spike'):
+def monitor_transform(pops: Sequence[BaseNeuron], attr: str = 'spike'):
+  """generate monitor parameters dictionary
+
+  Parameters
+  ----------
+  pops : Sequence[BaseNeuron]
+
+  attr : str, optional
+      attribute to monitor, by default 'spike'
+
+  Returns
+  -------
+  {attribute : BaseNeuron.attribute}
+  """
   mon_var = {}
   for pop in pops:
     try:

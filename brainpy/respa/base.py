@@ -1,18 +1,28 @@
 import brainpy.dyn as dyn
-from brainpy.modes import Mode, TrainingMode, BatchingMode, normal
-from typing import Dict, Union, Sequence, Callable
+from brainpy.modes import Mode, normal
+from brainpy.types import Shape, Array
+from typing import Union, Sequence, Callable, Tuple
 import jax.tree_util
-from mpi4py import MPI
 from brainpy import tools
-mpi_size = MPI.COMM_WORLD.Get_size()
-mpi_rank = MPI.COMM_WORLD.Get_rank()
+try:
+  from mpi4py import MPI
+  mpi_size = MPI.COMM_WORLD.Get_size()
+  mpi_rank = MPI.COMM_WORLD.Get_rank()
+except:
+  mpi_size = 1
+  mpi_rank = 0
 
 
 class BaseNeuron:
   pops = []
   pop_dist = []
 
-  def __init__(self, shape, *args, **kwargs):
+  def __init__(
+      self,
+      shape: Shape,
+      *args,
+      **kwargs
+  ):
     self.args = args
     self.kwargs = kwargs
     self.shape = shape
@@ -21,7 +31,7 @@ class BaseNeuron:
     self.pid = None
     self.pops.append(self)
 
-  def __getitem__(self, index):
+  def __getitem__(self, index: Union[slice, Sequence, Array]):
     return (self, index)
 
   def __getattr__(self, __name: str):
@@ -39,7 +49,13 @@ class BaseNeuron:
 class BaseSynapse:
   syns = []
 
-  def __init__(self, pre, post, *args, **kwargs):
+  def __init__(
+      self,
+      pre: Union[BaseNeuron, Tuple[BaseNeuron, Union[slice, Sequence, Array]]],
+      post: Union[BaseNeuron, Tuple[BaseNeuron, Union[slice, Sequence, Array]]],
+      *args,
+      **kwargs
+  ):
     self.pre = pre
     self.post = post
     self.args = args
@@ -64,12 +80,14 @@ class BaseSynapse:
       pre_slice = self.pre[1]
       if pre_pid == mpi_rank:
         pre = self.pre[0].lowref[self.pre[1]]
-    else:
+    elif isinstance(self.pre, BaseNeuron):
       pre_pid = self.pre.pid
       pre_shape = self.pre.shape
       pre_slice = None
       if pre_pid == mpi_rank:
         pre = self.pre.lowref
+    else:
+      raise ValueError(type(self.pre))
 
     if isinstance(self.post, tuple):
       post_pid = self.post[0].pid
@@ -77,12 +95,14 @@ class BaseSynapse:
       post_slice = self.post[1]
       if post_pid == mpi_rank:
         post = self.post[0].lowref[self.post[1]]
-    else:
+    elif isinstance(self.post, BaseNeuron):
       post_pid = self.post.pid
       post_shape = self.post.shape
       post_slice = None
       if post_pid == mpi_rank:
         post = self.post.lowref
+    else:
+      raise ValueError(type(self.post))
 
     if pre_pid == post_pid and pre_pid == mpi_rank:
       self.lowref = self.model_class(
@@ -107,13 +127,24 @@ class BaseSynapse:
 
 
 class LIF(BaseNeuron):
-  def __init__(self, shape, *args, **kwargs):
+  def __init__(
+      self,
+      shape: Shape,
+      *args,
+      **kwargs
+  ):
     super(LIF, self).__init__(shape, *args, **kwargs)
     self.model_class = dyn.LIF
 
 
 class Exponential(BaseSynapse):
-  def __init__(self, pre, post, *args, **kwargs):
+  def __init__(
+      self,
+      pre: Union[BaseNeuron, Tuple[BaseNeuron, Union[slice, Sequence, Array]]],
+      post: Union[BaseNeuron, Tuple[BaseNeuron, Union[slice, Sequence, Array]]],
+      *args,
+      **kwargs
+  ):
     super().__init__(pre, post, *args, **kwargs)
     self.model_class = dyn.synapses.Exponential
     self.model_class_remote = dyn.synapses.RemoteExponential
@@ -189,6 +220,8 @@ class DSRunner:
     elif isinstance(target, dyn.DynamicalSystem):
       self.lowref = dyn.DSRunner(
           target=target, inputs=inputs, fun_inputs=fun_inputs, dt=dt, t0=t0, **kwargs)
+    else:
+      raise ValueError(type(target))
 
   def __getattr__(self, __name: str):
     return self.lowref.__getattribute__(__name)
