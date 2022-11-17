@@ -1,3 +1,4 @@
+import sys
 import brainpy.dyn as dyn
 from brainpy.modes import Mode, normal
 from brainpy.types import Shape, Array
@@ -26,7 +27,7 @@ class BaseNeuron:
     self.args = args
     self.kwargs = kwargs
     self.shape = shape
-    self.model_class = None
+    # self.model_class = None
     self.lowref = None
     self.pid = None
     self.pops.append(self)
@@ -40,10 +41,22 @@ class BaseNeuron:
   def build(self):  # TODO check current pid
     if self.lowref is not None:
       return self.lowref
-    if not self.model_class:
-      raise Exception("model_class should not be None")
+    if not hasattr(self, 'model_class'):
+      raise Exception("model_class should be assigned")
     self.lowref = self.model_class(self.shape, *self.args, **self.kwargs)
     return self.lowref
+
+  @classmethod
+  def register(_, cls):
+    bases = (BaseNeuron,)
+    name = cls.__name__
+    attrs = {'__qualname__': name, 'model_class': cls}
+    respa_type = type(name, bases, attrs)
+    name_split = __name__.split('.')
+    if len(name_split) > 1:
+      setattr(sys.modules['.'.join(name_split[:-1])], name, respa_type)
+    setattr(sys.modules[__name__], name, respa_type)
+    return cls
 
 
 class BaseSynapse:
@@ -136,6 +149,9 @@ class LIF(BaseNeuron):
     super(LIF, self).__init__(shape, *args, **kwargs)
     self.model_class = dyn.LIF
 
+# another way to define respa LIF
+# BaseNeuron.register(dyn.LIF)
+
 
 class Exponential(BaseSynapse):
   def __init__(
@@ -200,6 +216,12 @@ class Network:
 
   def update(self, *args, **kwargs):
     self.lowref.update(*args, **kwargs)
+
+  def register_nodes(self, *nodes, **named_nodes):
+    self.lowref.register_implicit_nodes(*nodes, **named_nodes)
+
+  def register_vars(self, *variables, **named_variables):
+    self.lowref.register_implicit_vars(*variables, **named_variables)
 
 
 class DSRunner:
