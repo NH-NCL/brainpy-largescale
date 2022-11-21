@@ -45,15 +45,61 @@ class BaseNeuron:
     self.lowref = self.model_class(self.shape, *self.args, **self.kwargs)
     return self.lowref
 
-  @classmethod
-  def register(_, cls):
-    bases = (BaseNeuron,)
-    name = cls.__name__
-    attrs = {'__qualname__': name, 'model_class': cls}
+
+class register():
+  """decorator class to register user defined neuron model and synapse model to respa and base module
+
+  **Decorator Examples**
+
+    >>> import bpl
+    >>> from brainpy.dyn import channels
+    >>> @bpl.register()
+    >>> class HH(bp.dyn.CondNeuGroup):
+    >>>   def __init__(self, size):
+    >>>     super(HH, self).__init__(size, )
+    >>>     self.INa = channels.INa_TM1991(size, g_max=100., V_sh=-63.)
+    >>>     self.IK = channels.IK_TM1991(size, g_max=30., V_sh=-63.)
+    >>>     self.IL = channels.IL(size, E=-60., g_max=0.05)
+    >>> pop = bpl.HH(100)
+
+  Parameters
+  ----------
+  name : str = None
+    The name of the class in the bpl, respa and base module
+    User should use this class to create their model instance.
+  model : str = None
+    The type of the model
+    If model is None the type will be inferred from the class.
+  """
+
+  def __init__(self, name: str = None, model: str = None):
+    self.name = name
+    self.model = model.lower() if model is not None else None
+
+  def __call__(self, cls):
+    if self.model is None and issubclass(cls, dyn.NeuGroup) or self.model == 'neuron':
+      if self.name is None:
+        name = cls.__name__
+      else:
+        name = self.name
+      bases = (BaseNeuron,)
+      attrs = {'__qualname__': name, 'model_class': cls}
+    elif self.model is None and issubclass(cls, dyn.SynConn) or self.model == 'synapse':
+      if self.name is None:
+        name = cls.__name__
+      else:
+        name = self.name
+      bases = (BaseSynapse,)
+      attrs = {'__qualname__': name,
+               'model_class': cls, 'model_class_remote': None}
+    else:
+      raise RuntimeError(f'custom {self.model} is not supported')
     respa_type = type(name, bases, attrs)
     name_split = __name__.split('.')
     if len(name_split) > 1:
       setattr(sys.modules['.'.join(name_split[:-1])], name, respa_type)
+    if len(name_split) > 2:
+      setattr(sys.modules['.'.join(name_split[:-2])], name, respa_type)
     setattr(sys.modules[__name__], name, respa_type)
     return cls
 
@@ -72,7 +118,7 @@ class BaseSynapse:
     self.post = post
     self.args = args
     self.kwargs = kwargs
-    self.model_class = None
+    # self.model_class = None
     self.lowref = None
     self.syns.append(self)
 
@@ -83,8 +129,8 @@ class BaseSynapse:
     # assert self.pre.lowref is not None and self.post.lowref is not None
     if self.lowref is not None:
       return self.lowref
-    if not self.model_class:
-      raise Exception("model_class should not be None")
+    if not hasattr(self, 'model_class'):
+      raise Exception("model_class should be assigned")
 
     if isinstance(self.pre, tuple):
       pre_pid = self.pre[0].pid
@@ -162,7 +208,7 @@ class Exponential(BaseSynapse):
   ):
     super().__init__(pre, post, *args, **kwargs)
     self.model_class = dyn.synapses.Exponential
-    self.model_class_remote = dyn.synapses.RemoteExponential
+    self.model_class_remote = None  # dyn.synapses.RemoteExponential
 
 
 class Network:
