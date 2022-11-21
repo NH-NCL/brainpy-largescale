@@ -2,6 +2,7 @@ import unittest
 import bpl
 import brainpy as bp
 from brainpy.dyn import channels, synouts
+import brainpy.math as bm
 
 
 class BaseFunctionsTestCase(unittest.TestCase):
@@ -57,18 +58,43 @@ class BaseFunctionsTestCase(unittest.TestCase):
         self.IK = channels.IK_TM1991(size, g_max=30., V_sh=-63.)
         self.IL = channels.IL(size, E=-60., g_max=0.05)
 
+    @bpl.register()
+    class ExpCOBA(bp.dyn.TwoEndConn):
+      def __init__(self, pre, post, conn, g_max=1., delay=0., tau=8.0, E=0.,
+                   method='exp_auto'):
+        super(ExpCOBA, self).__init__(pre=pre, post=post, conn=conn)
+        self.check_pre_attrs('spike')
+        self.check_post_attrs('input', 'V')
+
+        # parameters
+        self.E = E
+        self.tau = tau
+        self.delay = delay
+        self.g_max = g_max
+        self.pre2post = self.conn.require('pre2post')
+
+        # variables
+        self.g = bm.Variable(bm.zeros(self.post.num))
+
+        # function
+        self.integral = bp.odeint(lambda g, t: -g / self.tau, method=method)
+
+      def update(self, tdi):
+        self.g.value = self.integral(self.g, tdi.t, tdi.dt)
+        self.g += bm.pre2post_event_sum(self.pre.spike,
+                                        self.pre2post, self.post.num, self.g_max)
+        self.post.input += self.g * (self.E - self.post.V)
+
     class EINet_v1(bpl.Network):
       def __init__(self, scale=1.):
         super(EINet_v1, self).__init__()
         self.E = bpl.HH(int(3200 * scale))
         self.I = bpl.HH(int(800 * scale))
         prob = 0.02
-        self.E2E = bpl.Exponential(self.E, self.E, bp.conn.FixedProb(prob),
-                                   g_max=0.03 / scale, tau=5,
-                                   output=synouts.COBA(E=0.))
-        self.E2I = bpl.Exponential(self.E, self.I, bp.conn.FixedProb(prob),
-                                   g_max=0.03 / scale, tau=5.,
-                                   output=synouts.COBA(E=0.))
+        self.E2E = bpl.ExpCOBA(self.E, self.E, bp.conn.FixedProb(prob),
+                               g_max=0.03 / scale, tau=5)
+        self.E2I = bpl.ExpCOBA(self.E, self.I, bp.conn.FixedProb(prob),
+                               g_max=0.03 / scale, tau=5.)
         self.I2E = bpl.Exponential(self.I, self.E, bp.conn.FixedProb(prob),
                                    g_max=0.335 / scale, tau=10.,
                                    output=synouts.COBA(E=-80))
