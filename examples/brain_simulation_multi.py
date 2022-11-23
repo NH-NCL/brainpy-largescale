@@ -1,14 +1,15 @@
-# -*- coding: utf-8 -*-
+import sys
+sys.path.append('../')
 import bpl
 import brainpy as bp
-# import os 
+import os 
 
-# os.environ['CUDA_VISIBLE_DEVICES'] = "1"
+os.environ['CUDA_VISIBLE_DEVICES'] = "1"
 
 bp.math.set_platform('cpu')
 
 
-class EINet_V1(bp.dyn.Network):
+class EINet_V1(bpl.RemoteNetwork):
   def __init__(self, scale=1.0, method='exp_auto'):
     super(EINet_V1, self).__init__()
 
@@ -32,12 +33,12 @@ class EINet_V1(bp.dyn.Network):
                                        tau=5., 
                                        method=method,
                                        delay_step=1)
-      self.I2 = bpl.neurons.FakeLIF(num_exc, **pars, method=method)
-      self.I3 = bpl.neurons.FakeLIF(num_exc, **pars, method=method)
+      self.I2 = bpl.neurons.ProxyLIF(num_exc, **pars, method=method)
+      self.I3 = bpl.neurons.ProxyLIF(num_exc, **pars, method=method)
       
     elif self.rank == 1:
-      self.E1 = bpl.neurons.FakeLIF(num_exc, **pars, method=method)
-      self.I1 = bpl.neurons.FakeLIF(num_exc, **pars, method=method)
+      self.E1 = bpl.neurons.ProxyLIF(num_exc, **pars, method=method)
+      self.I1 = bpl.neurons.ProxyLIF(num_exc, **pars, method=method)
       self.I2 = bp.neurons.LIF(num_inh, **pars, method=method)
       self.I3 = bp.neurons.LIF(num_exc, **pars, method=method)
     self.remoteE12I2 = bpl.synapses.RemoteExponential(0, self.E1, 1, self.I2, 

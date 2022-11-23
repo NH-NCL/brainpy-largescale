@@ -2,11 +2,12 @@ from typing import Union, Dict, Sequence
 import brainpy.math as bm
 from brainpy.dyn.base import Network, DynamicalSystem
 from brainpy.modes import Mode, normal
+from .base import RemoteDynamicalSystem
 from mpi4py import MPI
 import mpi4jax
 
 
-class RemoteNetwork(Network):
+class RemoteNetwork(Network, RemoteDynamicalSystem):
   """Exponential decay synapse model in multi-device environment.
   """
 

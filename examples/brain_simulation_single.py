@@ -1,10 +1,11 @@
-# -*- coding: utf-8 -*-
+import sys
+sys.path.append('../')
 import brainpy as bp
 
 bp.math.set_platform('cpu')
 
 
-class EINet_V1(bpl.dyn.Network):
+class EINet_V1(bp.dyn.Network):
   def __init__(self, scale=1.0, method='exp_auto', comm=None):
     super(EINet_V1, self).__init__(comm=comm)
 
