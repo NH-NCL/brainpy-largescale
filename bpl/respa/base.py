@@ -2,9 +2,13 @@ import sys
 import brainpy.dyn as dyn
 from brainpy.modes import Mode, normal
 from brainpy.types import Shape, Array
-from typing import Union, Sequence, Callable, Tuple
+from brainpy.connect import TwoEndConnector
+from typing import Union, Sequence, Callable, Tuple, Dict
 import jax.tree_util
 from brainpy import tools
+from .res_manager import ResManager
+import bpl
+
 try:
   from mpi4py import MPI
   mpi_size = MPI.COMM_WORLD.Get_size()
@@ -14,8 +18,14 @@ except:
   mpi_rank = 0
 
 
+pop_id = 0
+def get_pop_id():
+  global pop_id
+  pop_id += 1
+  return pop_id
+
+
 class BaseNeuron:
-  pops = []
 
   def __init__(
       self,
@@ -28,8 +38,13 @@ class BaseNeuron:
     self.shape = shape
     # self.model_class = None
     self.lowref = None
+    # process id
     self.pid = None
-    self.pops.append(self)
+    # population id, autoincrement
+    self.id = get_pop_id()
+    self.neuron_start_id = 0
+    ResManager.pops.append(self)
+    ResManager.pops_by_id[self.id] = self
 
   def __getitem__(self, index: Union[slice, Sequence, Array]):
     return (self, index)
@@ -105,22 +120,23 @@ class register():
 
 
 class BaseSynapse:
-  syns = []
 
   def __init__(
       self,
       pre: Union[BaseNeuron, Tuple[BaseNeuron, Union[slice, Sequence, Array]]],
       post: Union[BaseNeuron, Tuple[BaseNeuron, Union[slice, Sequence, Array]]],
+      conn: Union[TwoEndConnector, Array, Dict[str, Array]],
       *args,
       **kwargs
   ):
     self.pre = pre
     self.post = post
+    self.conn = conn
     self.args = args
     self.kwargs = kwargs
     # self.model_class = None
     self.lowref = None
-    self.syns.append(self)
+    ResManager.syns.append(self)
 
   def __getattr__(self, __name: str):
     return self.lowref.__getattribute__(__name)
@@ -164,7 +180,7 @@ class BaseSynapse:
 
     if pre_pid == post_pid and pre_pid == mpi_rank:
       self.lowref = self.model_class(
-          pre, post, *self.args, **self.kwargs)
+          pre, post, self.conn, *self.args, **self.kwargs)
     elif pre_pid == mpi_rank:
       tmp_ = dyn.LIF(0)
       tmp_.size = post_shape
@@ -172,7 +188,7 @@ class BaseSynapse:
       if post_slice is not None:
         tmp_ = tmp_[post_slice]
       self.lowref = self.model_class_remote(
-          pre_pid, pre, post_pid, tmp_, *self.args, **self.kwargs)
+          pre_pid, pre, post_pid, tmp_, conn=self.conn, *self.args, **self.kwargs)
     elif post_pid == mpi_rank:
       tmp_ = dyn.LIF(0)
       tmp_.size = pre_shape
@@ -180,7 +196,7 @@ class BaseSynapse:
       if pre_slice is not None:
         tmp_ = tmp_[pre_slice]
       self.lowref = self.model_class_remote(
-          pre_pid, tmp_, post_pid, post, *self.args, **self.kwargs)
+          pre_pid, tmp_, post_pid, post, conn=self.conn, *self.args, **self.kwargs)
     return self.lowref
 
 
@@ -203,10 +219,11 @@ class Exponential(BaseSynapse):
       self,
       pre: Union[BaseNeuron, Tuple[BaseNeuron, Union[slice, Sequence, Array]]],
       post: Union[BaseNeuron, Tuple[BaseNeuron, Union[slice, Sequence, Array]]],
+      conn: Union[TwoEndConnector, Array, Dict[str, Array]],
       *args,
       **kwargs
   ):
-    super().__init__(pre, post, *args, **kwargs)
+    super().__init__(pre, post, conn, *args, **kwargs)
     self.model_class = dyn.synapses.Exponential
     self.model_class_remote = None  # dyn.synapses.RemoteExponential
 
@@ -221,14 +238,14 @@ class Network:
     return self.lowref.__getattribute__(__name)
 
   def build_all_population_synapse(self):
-    for pop in BaseNeuron.pops:
+    for pop in ResManager.pops:
       pop.build()
-    for syn in BaseSynapse.syns:
+    for syn in ResManager.syns:
       syn.build()
     self.lowref.register_implicit_nodes(
-        *map(lambda x: x.lowref, BaseNeuron.pops))
+        *map(lambda x: x.lowref, ResManager.pops))
     self.lowref.register_implicit_nodes(
-        *map(lambda x: x.lowref, BaseSynapse.syns))
+        *map(lambda x: x.lowref, ResManager.syns))
 
   def build(self):
     self.pops_ = []
@@ -248,11 +265,15 @@ class Network:
         res[i].extend(pops_[i*avg:i*avg+avg])
       res[-1].extend(pops_[avg*mpi_size:])
       return res
-    self.pops_split = simple_split(self.pops_)
+    pops_by_rank = simple_split(self.pops_)
+    offset = 1
     for i in range(mpi_size):
-      for __pops in self.pops_split[i]:
+      for __pops in pops_by_rank[i]:
         __pops.pid = i
-    for node in self.pops_split[mpi_rank]:
+    for node in pops_by_rank[mpi_rank]:
+      node.neuron_start_id = offset
+      offset += node.shape
+
       node.build()
       self.lowref.register_implicit_nodes(node.lowref)
     for node in self.syns_:
@@ -270,6 +291,7 @@ class Network:
 
 
 class DSRunner:
+
   def __init__(
       self,
       target: Union[dyn.DynamicalSystem, Network],
@@ -279,16 +301,35 @@ class DSRunner:
       # extra info
       dt: float = None,
       t0: Union[float, int] = 0.,
+      spike_callback: Callable = None,
+      volt_callback: Callable = None,
       **kwargs
   ):
-    if isinstance(target, Network):
-      self.lowref = dyn.DSRunner(
-          target=target.lowref, inputs=inputs, fun_inputs=fun_inputs, dt=dt, t0=t0, **kwargs)
-    elif isinstance(target, dyn.DynamicalSystem):
-      self.lowref = dyn.DSRunner(
-          target=target, inputs=inputs, fun_inputs=fun_inputs, dt=dt, t0=t0, **kwargs)
-    else:
+    if not isinstance(target, (Network, dyn.DynamicalSystem)):
       raise ValueError(type(target))
+
+    if isinstance(target, Network):
+      target = target.lowref
+    
+    def _callback(t: float, d: dict):
+      for k, v in d.items():
+        if k == 'spike' and spike_callback:
+          tmp = ''
+          for i, j in enumerate(v):
+            if j == True:
+              tmp += '{},{:.2f}\n'.format(i + 1, t)
+          spike_callback(tmp)
+        if k == 'V' and volt_callback:
+          tmp = ''
+          for i, j in enumerate(v):
+            tmp += '{},{:.2f},{:.2f}\n'.format(i + 1, t, j)
+          volt_callback(tmp)
+    c = _callback if spike_callback or volt_callback else None    
+
+    self.lowref = bpl.BplRunner(
+      target=target, inputs=inputs,
+      fun_inputs=fun_inputs, dt=dt,
+      t0=t0, callback=c, **kwargs)
 
   def __getattr__(self, __name: str):
     return self.lowref.__getattribute__(__name)

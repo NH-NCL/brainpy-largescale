@@ -5,8 +5,7 @@ from jax.lax import stop_gradient
 
 import brainpy.math as bm
 from brainpy.connect import TwoEndConnector, All2All, One2One
-from brainpy.dyn.base import NeuGroup, SynOut, SynSTP
-from brainpy.dyn.synapses import Exponential
+from brainpy import dyn
 from brainpy.initialize import Initializer, variable_, parameter
 from brainpy.integrators import odeint
 from brainpy.modes import Mode, BatchingMode, normal
@@ -19,20 +18,20 @@ import jax.numpy as jnp
 import mpi4jax
 
 
-class RemoteExponential(Exponential, RemoteDynamicalSystem):
+class RemoteExponential(dyn.synapses.Exponential, RemoteDynamicalSystem):
   """Exponential decay synapse model in multi-device environment.
   """
 
   def __init__(
       self,
       source_rank,
-      pre: NeuGroup,
+      pre: dyn.NeuGroup,
       target_rank,
-      post: NeuGroup,
+      post: dyn.NeuGroup,
       conn: Union[TwoEndConnector, Array, Dict[str, Array]],
       comm=MPI.COMM_WORLD,
-      output: SynOut = CUBA(),
-      stp: Optional[SynSTP] = None,
+      output: dyn.SynOut = CUBA(),
+      stp: Optional[dyn.SynSTP] = None,
       comp_method: str = 'sparse',
       g_max: Union[float, Array, Initializer, Callable] = 1.,
       delay_step: Union[int, Array, Initializer, Callable] = None,

@@ -1,13 +1,13 @@
 from typing import Union, Sequence
 import collections
 import brainpy.math as bm
-from brainpy.dyn.base import DynamicalSystem, NeuGroup, _slice_to_num
+from brainpy import dyn
 from brainpy.initialize import variable_
 from brainpy.modes import Mode, TrainingMode, normal
 from brainpy.types import Array, Shape
 
 
-class ProxyNeuGroup(NeuGroup):
+class ProxyNeuGroup(dyn.NeuGroup):
   """Base class to model neuronal groups in multi-device enviornment.
   """
 
@@ -39,8 +39,8 @@ class ProxyNeuGroupView(ProxyNeuGroup):
       keep_size: bool = False
   ):
     # check target
-    if not isinstance(target, DynamicalSystem):
-      raise TypeError(f'Should be instance of DynamicalSystem, but we got {type(target)}.')
+    if not isinstance(target, dyn.DynamicalSystem):
+      raise TypeError(f'Should be instance of dyn.DynamicalSystem, but we got {type(target)}.')
 
     # check slicing
     if isinstance(index, (int, slice)):
@@ -60,7 +60,7 @@ class ProxyNeuGroupView(ProxyNeuGroup):
       if isinstance(idx, int):
         size.append(1)
       elif isinstance(idx, slice):
-        size.append(_slice_to_num(idx, var_shapes[i]))
+        size.append(dyn._slice_to_num(idx, var_shapes[i]))
       else:
         # should be a list/tuple/array of int
         # do not check again
