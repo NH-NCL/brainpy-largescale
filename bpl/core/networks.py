@@ -1,13 +1,13 @@
 from typing import Union, Dict, Sequence
 import brainpy.math as bm
-from brainpy.dyn.base import Network, DynamicalSystem
+from brainpy import dyn
 from brainpy.modes import Mode, normal
 from .base import RemoteDynamicalSystem
 from mpi4py import MPI
 import mpi4jax
 
 
-class RemoteNetwork(Network, RemoteDynamicalSystem):
+class RemoteNetwork(dyn.Network, RemoteDynamicalSystem):
   """Exponential decay synapse model in multi-device environment.
   """
 
@@ -34,13 +34,13 @@ class RemoteNetwork(Network, RemoteDynamicalSystem):
     """
     # update delays
     if nodes is None:
-      nodes = tuple(self.nodes(level=1, include_self=False).subset(DynamicalSystem).unique().values())
-    elif isinstance(nodes, DynamicalSystem):
+      nodes = tuple(self.nodes(level=1, include_self=False).subset(dyn.DynamicalSystem).unique().values())
+    elif isinstance(nodes, dyn.DynamicalSystem):
       nodes = (nodes, )
     elif isinstance(nodes, dict):
       nodes = tuple(nodes.values())
     if not isinstance(nodes, (tuple, list)):
-      raise ValueError('Please provide nodes as a list/tuple/dict of DynamicalSystem.')
+      raise ValueError('Please provide nodes as a list/tuple/dict of dyn.DynamicalSystem.')
     for node in nodes:
       if hasattr(node, 'comm'):
         for name in node.local_delay_vars:
@@ -62,7 +62,7 @@ class RemoteNetwork(Network, RemoteDynamicalSystem):
     """
     # reset delays
     if nodes is None:
-      nodes = self.nodes(level=1, include_self=False).subset(DynamicalSystem).unique().values()
+      nodes = self.nodes(level=1, include_self=False).subset(dyn.DynamicalSystem).unique().values()
     elif isinstance(nodes, dict):
       nodes = nodes.values()
     for node in nodes:
