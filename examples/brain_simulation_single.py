@@ -1,15 +1,10 @@
 # -*- coding: utf-8 -*-
-from mpi4py import MPI
 import brainpy as bp
-import brainpy.math as bm
-from brainpy.math.jaxarray import ndarray, Variable, JaxArray
-import jax.numpy as jnp
-from brainpy import tools
 
 bp.math.set_platform('cpu')
 
 
-class EINet_V1(bp.dyn.Network):
+class EINet_V1(bpl.dyn.Network):
   def __init__(self, scale=1.0, method='exp_auto', comm=None):
     super(EINet_V1, self).__init__(comm=comm)
 
