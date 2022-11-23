@@ -1,10 +1,6 @@
-# -*- coding: utf-8 -*-
-from mpi4py import MPI
+import sys
+sys.path.append('../')
 import brainpy as bp
-import brainpy.math as bm
-from brainpy.math.jaxarray import ndarray, Variable, JaxArray
-import jax.numpy as jnp
-from brainpy import tools
 
 bp.math.set_platform('cpu')
 

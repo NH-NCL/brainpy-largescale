@@ -1,14 +1,15 @@
-# -*- coding: utf-8 -*-
-from mpi4py import MPI
+import sys
+sys.path.append('../')
+import bpl
 import brainpy as bp
-import brainpy.math as bm
-from brainpy.math.jaxarray import ndarray, Variable, JaxArray
-import jax.numpy as jnp
-from brainpy import tools
+import os 
+
+os.environ['CUDA_VISIBLE_DEVICES'] = "1"
+
 bp.math.set_platform('cpu')
 
 
-class EINet_V1(bp.dyn.Network):
+class EINet_V1(bpl.RemoteNetwork):
   def __init__(self, scale=1.0, method='exp_auto'):
     super(EINet_V1, self).__init__()
 
@@ -32,18 +33,15 @@ class EINet_V1(bp.dyn.Network):
                                        tau=5., 
                                        method=method,
                                        delay_step=1)
-      self.I2 = bp.neurons.LIF(0)
-      self.I2.size = num_inh
-      self.I2.num = tools.size2num(self.I2.size)
+      self.I2 = bpl.neurons.ProxyLIF(num_exc, **pars, method=method)
+      self.I3 = bpl.neurons.ProxyLIF(num_exc, **pars, method=method)
+      
     elif self.rank == 1:
-      self.E1 = bp.neurons.LIF(0)
-      self.E1.size = num_exc
-      self.E1.num = tools.size2num(self.E1.size)
-      self.I1 = bp.neurons.LIF(0)
-      self.I1.size = num_inh
-      self.I1.num = tools.size2num(self.I1.size)
+      self.E1 = bpl.neurons.ProxyLIF(num_exc, **pars, method=method)
+      self.I1 = bpl.neurons.ProxyLIF(num_exc, **pars, method=method)
       self.I2 = bp.neurons.LIF(num_inh, **pars, method=method)
-    self.remoteE12I2 = bp.synapses.RemoteExponential(0, self.E1, 1, self.I2, 
+      self.I3 = bp.neurons.LIF(num_exc, **pars, method=method)
+    self.remoteE12I2 = bpl.synapses.RemoteExponential(0, self.E1, 1, self.I2, 
                                                     bp.conn.FixedProb(0.02,seed=1), 
                                                       output=bp.synouts.COBA(E=0.), g_max=we,
                                                       tau=5., 
@@ -57,7 +55,7 @@ def run_model_v1():
     net,
     monitors={'I2.spike': net.I2.spike},
     inputs=[(net.E1.input, 200.), (net.I1.input, 200.)],
-    jit=False
+    jit=True
   )
   runner.run(10.)
 
