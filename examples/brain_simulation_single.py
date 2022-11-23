@@ -6,8 +6,8 @@ bp.math.set_platform('cpu')
 
 
 class EINet_V1(bp.dyn.Network):
-  def __init__(self, scale=1.0, method='exp_auto', comm=None):
-    super(EINet_V1, self).__init__(comm=comm)
+  def __init__(self, scale=1.0, method='exp_auto'):
+    super(EINet_V1, self).__init__()
 
     # network size
     num_exc = int(3200 * scale)
@@ -43,7 +43,7 @@ def run_model_v1():
     net,
     monitors={'I2.spike': net.I2.spike},
     inputs=[(net.E1.input, 200.), (net.I1.input, 200.)],
-    jit=False
+    jit=True
   )
   runner.run(10.)
 
