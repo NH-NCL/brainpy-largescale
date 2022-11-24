@@ -45,7 +45,7 @@ class BaseFunctionsTestCase(unittest.TestCase):
       bp.visualize.raster_plot(
           runner.mon.ts, runner.mon['spike'], show=True)
       print(net.pops_)
-      print(net.pops_split)
+      print(net.pops_by_rank)
       print(net.syns_)
       # print(net.nodes())
 
