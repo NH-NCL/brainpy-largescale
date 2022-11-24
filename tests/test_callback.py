@@ -34,7 +34,7 @@ class BaseFunctionsTestCase(unittest.TestCase):
     monitor_spike = bpl.monitor_transform([net.a], attr='spike')
     monitor_volt = bpl.monitor_transform([net.a], attr='V')
     monitors = {}
-    # monitors.update(monitor_spike)
+    monitors.update(monitor_spike)
     monitors.update(monitor_volt)
     def spike(s: str):
       print(s)
