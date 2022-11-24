@@ -1,0 +1,13 @@
+brainpy
+numpy>=1.15
+jax>=0.3.0
+tqdm
+numba
+mpi4py
+brainpylib
+mpi4jax
+jax[cpu]==0.3.24
+
+# test requirement
+pytest
+absl-py
