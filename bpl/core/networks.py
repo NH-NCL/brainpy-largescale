@@ -5,7 +5,7 @@ from brainpy.modes import Mode, normal
 from .base import RemoteDynamicalSystem
 from mpi4py import MPI
 import platform
-if platform.system()=='Windows':
+if platform.system()!='Windows':
   import mpi4jax
 import numpy as np
 
@@ -89,9 +89,9 @@ class RemoteNetwork(Network, RemoteDynamicalSystem):
           elif self.rank == node.target_rank:
             delay = self.remote_global_delay_data[name][0]
             if platform.system()=='Windows':
-              pre_len = self.comm.recv(source=node.source_rank, tag=2)
+              pre_len = self.comm.recv(source=node.source_rank, tag=4)
               target = np.empty(pre_len, dtype=np.bool_)
-              self.comm.Recv(target, source=node.source_rank, tag=3)
+              self.comm.Recv(target, source=node.source_rank, tag=5)
             else:
               target, token = mpi4jax.recv(node.pre.spike.value, source=node.source_rank, tag=4, comm=self.comm)
             target = bm.Variable(target)

@@ -17,7 +17,7 @@ from bpl.core.base import RemoteDynamicalSystem
 from mpi4py import MPI
 import jax.numpy as jnp
 import platform
-if platform.system()=='Windows':
+if platform.system()!='Windows':
   import mpi4jax
 
 
