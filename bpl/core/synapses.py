@@ -16,7 +16,8 @@ from bpl.core.base import RemoteDynamicalSystem
 from mpi4py import MPI
 import jax.numpy as jnp
 import platform
-if platform.system()!='Windows':
+
+if platform.system() != 'Windows':
   import mpi4jax
 
 
@@ -25,35 +26,35 @@ class RemoteExponential(dyn.synapses.Exponential, RemoteDynamicalSystem):
   """
 
   def __init__(
-      self,
-      source_rank,
-      pre: dyn.NeuGroup,
-      target_rank,
-      post: dyn.NeuGroup,
-      conn: Union[TwoEndConnector, Array, Dict[str, Array]],
-      comm=MPI.COMM_WORLD,
-      output: dyn.SynOut = CUBA(),
-      stp: Optional[dyn.SynSTP] = None,
-      comp_method: str = 'sparse',
-      g_max: Union[float, Array, Initializer, Callable] = 1.,
-      delay_step: Union[int, Array, Initializer, Callable] = None,
-      tau: Union[float, Array] = 8.0,
-      method: str = 'exp_auto',
+    self,
+    source_rank,
+    pre: dyn.NeuGroup,
+    target_rank,
+    post: dyn.NeuGroup,
+    conn: Union[TwoEndConnector, Array, Dict[str, Array]],
+    comm=MPI.COMM_WORLD,
+    output: dyn.SynOut = CUBA(),
+    stp: Optional[dyn.SynSTP] = None,
+    comp_method: str = 'sparse',
+    g_max: Union[float, Array, Initializer, Callable] = 1.,
+    delay_step: Union[int, Array, Initializer, Callable] = None,
+    tau: Union[float, Array] = 8.0,
+    method: str = 'exp_auto',
 
-      # other parameters
-      name: str = None,
-      mode: Mode = normal,
-      stop_spike_gradient: bool = False,
-      
+    # other parameters
+    name: str = None,
+    mode: Mode = normal,
+    stop_spike_gradient: bool = False,
+
   ):
     super(RemoteExponential, self).__init__(pre=pre,
-                                      post=post,
-                                      conn=conn,
-                                      output=output,
-                                      stp=stp,
-                                      name=name,
-                                      mode=mode,
-                                      )
+                                            post=post,
+                                            conn=conn,
+                                            output=output,
+                                            stp=stp,
+                                            name=name,
+                                            mode=mode,
+                                            )
     # parameters
     self.stop_spike_gradient = stop_spike_gradient
     self.comp_method = comp_method
@@ -69,10 +70,10 @@ class RemoteExponential(dyn.synapses.Exponential, RemoteDynamicalSystem):
     self.target_rank = target_rank
     self.rank = self.comm.Get_rank()
     if self.rank == source_rank:
-      #Make sure the same neuron group only deliver its spike one time during one step network simulation
+      # Make sure the same neuron group only deliver its spike one time during one step network simulation
       if self.pre.name not in self.remote_first_send_mark:
         self.remote_first_send_mark.append(self.pre.name)
-        if platform.system()=='Windows':
+        if platform.system() == 'Windows':
           self.comm.send(len(self.pre.spike), dest=target_rank, tag=0)
           self.comm.Send(self.pre.spike.to_numpy(), dest=target_rank, tag=1)
         else:
@@ -81,10 +82,10 @@ class RemoteExponential(dyn.synapses.Exponential, RemoteDynamicalSystem):
     elif self.rank == target_rank:
       # connections and weights
       self.g_max, self.conn_mask = self.init_weights(g_max, comp_method, sparse_data='csr')
-      
+
       if self.pre.name not in self.remote_first_send_mark:
         self.remote_first_send_mark.append(self.pre.name)
-        if platform.system()=='Windows':
+        if platform.system() == 'Windows':
           pre_len = self.comm.recv(source=source_rank, tag=0)
           pre_spike = np.empty(pre_len, dtype=np.bool_)
           self.comm.Recv(pre_spike, source=source_rank, tag=1)
@@ -97,11 +98,11 @@ class RemoteExponential(dyn.synapses.Exponential, RemoteDynamicalSystem):
       self.integral = odeint(lambda g, t: -g / self.tau, method=method)
 
   def remote_register_delay(
-      self,
-      identifier: str,
-      delay_step: Optional[Union[int, Array, Callable, Initializer]],
-      delay_target: bm.Variable,
-      initial_delay_data: Union[Initializer, Callable, Array, float, int, bool] = None,
+    self,
+    identifier: str,
+    delay_step: Optional[Union[int, Array, Callable, Initializer]],
+    delay_target: bm.Variable,
+    initial_delay_data: Union[Initializer, Callable, Array, float, int, bool] = None,
   ):
     """Register delay variable in multi-device enviornmrnt.
     """
@@ -174,27 +175,32 @@ class RemoteExponential(dyn.synapses.Exponential, RemoteDynamicalSystem):
 
       # update sub-components
       self.output.update(tdi)
-      if self.stp is not None: self.stp.update(tdi, pre_spike)
+      if self.stp is not None:
+        self.stp.update(tdi, pre_spike)
 
       # post values
       if isinstance(self.conn, All2All):
         syn_value = bm.asarray(pre_spike, dtype=bm.dftype())
-        if self.stp is not None: syn_value = self.stp(syn_value)
+        if self.stp is not None:
+          syn_value = self.stp(syn_value)
         post_vs = self.syn2post_with_all2all(syn_value, self.g_max)
       elif isinstance(self.conn, One2One):
         syn_value = bm.asarray(pre_spike, dtype=bm.dftype())
-        if self.stp is not None: syn_value = self.stp(syn_value)
+        if self.stp is not None:
+          syn_value = self.stp(syn_value)
         post_vs = self.syn2post_with_one2one(syn_value, self.g_max)
       else:
         if self.comp_method == 'sparse':
           f = lambda s: bm.pre2post_event_sum(s, self.conn_mask, self.post.num, self.g_max)
-          if isinstance(self.mode, BatchingMode): f = vmap(f)
+          if isinstance(self.mode, BatchingMode):
+            f = vmap(f)
           post_vs = f(pre_spike)
           # if not isinstance(self.stp, _NullSynSTP):
           #   raise NotImplementedError()
         else:
           syn_value = bm.asarray(pre_spike, dtype=bm.dftype())
-          if self.stp is not None: syn_value = self.stp(syn_value)
+          if self.stp is not None:
+            syn_value = self.stp(syn_value)
           post_vs = self.syn2post_with_dense(syn_value, self.g_max, self.conn_mask)
       # updates
       self.g.value = self.integral(self.g.value, t, dt) + post_vs
@@ -202,10 +208,10 @@ class RemoteExponential(dyn.synapses.Exponential, RemoteDynamicalSystem):
       return self.output(self.g)
 
   def remote_get_delay_data(
-      self,
-      identifier: str,
-      delay_step: Optional[Union[int, bm.JaxArray, jnp.DeviceArray]],
-      *indices: Union[int, slice, bm.JaxArray, jnp.DeviceArray],
+    self,
+    identifier: str,
+    delay_step: Optional[Union[int, bm.JaxArray, jnp.DeviceArray]],
+    *indices: Union[int, slice, bm.JaxArray, jnp.DeviceArray],
   ):
     """Get delay data according to the provided delay steps in multi-device enviornment.
     """

@@ -5,18 +5,17 @@ from brainpy.types import Shape, Array
 from brainpy.connect import TwoEndConnector
 from typing import Union, Sequence, Callable, Tuple, Dict
 import jax.tree_util
-from brainpy import tools
 from .res_manager import ResManager
 import bpl
 
 try:
   from mpi4py import MPI
+
   mpi_size = MPI.COMM_WORLD.Get_size()
   mpi_rank = MPI.COMM_WORLD.Get_rank()
-except:
+except ImportError:
   mpi_size = 1
   mpi_rank = 0
-
 
 pop_id = 0
 
@@ -27,14 +26,20 @@ def get_pop_id():
   return pop_id
 
 
+def reset():
+  global pop_id
+  ResManager.clear()
+  pop_id = 0
+
+
 class BaseNeuron:
   proxy_neurons = {}
 
   def __init__(
-      self,
-      shape: Shape,
-      *args,
-      **kwargs
+    self,
+    shape: Shape,
+    *args,
+    **kwargs
   ):
     self.args = args
     self.kwargs = kwargs
@@ -131,12 +136,12 @@ class register():
 class BaseSynapse:
 
   def __init__(
-      self,
-      pre: Union[BaseNeuron, Tuple[BaseNeuron, Union[slice, Sequence, Array]]],
-      post: Union[BaseNeuron, Tuple[BaseNeuron, Union[slice, Sequence, Array]]],
-      conn: Union[TwoEndConnector, Array, Dict[str, Array]],
-      *args,
-      **kwargs
+    self,
+    pre: Union[BaseNeuron, Tuple[BaseNeuron, Union[slice, Sequence, Array]]],
+    post: Union[BaseNeuron, Tuple[BaseNeuron, Union[slice, Sequence, Array]]],
+    conn: Union[TwoEndConnector, Array, Dict[str, Array]],
+    *args,
+    **kwargs
   ):
     self.pre = pre
     self.post = post
@@ -197,7 +202,7 @@ class BaseSynapse:
 
     if pre_pid == post_pid and pre_pid == mpi_rank:
       self.lowref = self.model_class(
-          pre, post, self.conn, *self.args, **self.kwargs)
+        pre, post, self.conn, *self.args, **self.kwargs)
     elif pre_pid == mpi_rank:
       if post not in BaseNeuron.proxy_neurons:
         tmp_ = bpl.neurons.ProxyLIF(post_shape)
@@ -207,7 +212,7 @@ class BaseSynapse:
       if post_slice is not None:
         tmp_ = tmp_[post_slice]
       self.lowref = self.model_class_remote(
-          pre_pid, pre, post_pid, tmp_, conn=self.conn, *self.args, **self.kwargs)
+        pre_pid, pre, post_pid, tmp_, conn=self.conn, *self.args, **self.kwargs)
     elif post_pid == mpi_rank:
       if pre not in BaseNeuron.proxy_neurons:
         tmp_ = bpl.neurons.ProxyLIF(pre_shape)
@@ -217,19 +222,20 @@ class BaseSynapse:
       if pre_slice is not None:
         tmp_ = tmp_[pre_slice]
       self.lowref = self.model_class_remote(
-          pre_pid, tmp_, post_pid, post, conn=self.conn, *self.args, **self.kwargs)
+        pre_pid, tmp_, post_pid, post, conn=self.conn, *self.args, **self.kwargs)
     return self.lowref
 
 
 class LIF(BaseNeuron):
   def __init__(
-      self,
-      shape: Shape,
-      *args,
-      **kwargs
+    self,
+    shape: Shape,
+    *args,
+    **kwargs
   ):
     super(LIF, self).__init__(shape, *args, **kwargs)
     self.model_class = dyn.LIF
+
 
 # another way to define respa LIF
 # BaseNeuron.register(dyn.LIF)
@@ -237,12 +243,12 @@ class LIF(BaseNeuron):
 
 class Exponential(BaseSynapse):
   def __init__(
-      self,
-      pre: Union[BaseNeuron, Tuple[BaseNeuron, Union[slice, Sequence, Array]]],
-      post: Union[BaseNeuron, Tuple[BaseNeuron, Union[slice, Sequence, Array]]],
-      conn: Union[TwoEndConnector, Array, Dict[str, Array]],
-      *args,
-      **kwargs
+    self,
+    pre: Union[BaseNeuron, Tuple[BaseNeuron, Union[slice, Sequence, Array]]],
+    post: Union[BaseNeuron, Tuple[BaseNeuron, Union[slice, Sequence, Array]]],
+    conn: Union[TwoEndConnector, Array, Dict[str, Array]],
+    *args,
+    **kwargs
   ):
     super().__init__(pre, post, conn, *args, **kwargs)
     self.model_class = dyn.synapses.Exponential
@@ -264,9 +270,9 @@ class Network:
     for syn in ResManager.syns:
       syn.build()
     self.lowref.register_implicit_nodes(
-        *map(lambda x: x.lowref, ResManager.pops))
+      *map(lambda x: x.lowref, ResManager.pops))
     self.lowref.register_implicit_nodes(
-        *map(lambda x: x.lowref, ResManager.syns))
+      *map(lambda x: x.lowref, ResManager.syns))
 
   def build(self):
     self.pops_ = []
@@ -277,15 +283,17 @@ class Network:
         self.pops_.append(v)
       elif isinstance(v, BaseSynapse):
         self.syns_.append(v)
+
     jax.tree_util.tree_map(reg_pop_syn, self.__dict__)
 
     def simple_split(pops_):
       res = [[] for i in range(mpi_size)]
       avg = len(pops_) // mpi_size
       for i in range(mpi_size):
-        res[i].extend(pops_[i*avg:i*avg+avg])
-      res[-1].extend(pops_[avg*mpi_size:])
+        res[i].extend(pops_[i * avg:i * avg + avg])
+      res[-1].extend(pops_[avg * mpi_size:])
       return res
+
     self.pops_by_rank = simple_split(self.pops_)
     offset = 1
     for i in range(mpi_size):
@@ -314,17 +322,17 @@ class Network:
 class DSRunner:
 
   def __init__(
-      self,
-      target: Union[dyn.DynamicalSystem, Network],
-      # inputs for target variables
-      inputs: Sequence = (),
-      fun_inputs: Callable = None,
-      # extra info
-      dt: float = None,
-      t0: Union[float, int] = 0.,
-      spike_callback: Callable = None,
-      volt_callback: Callable = None,
-      **kwargs
+    self,
+    target: Union[dyn.DynamicalSystem, Network],
+    # inputs for target variables
+    inputs: Sequence = (),
+    fun_inputs: Callable = None,
+    # extra info
+    dt: float = None,
+    t0: Union[float, int] = 0.,
+    spike_callback: Callable = None,
+    volt_callback: Callable = None,
+    **kwargs
   ):
     if not isinstance(target, (Network, dyn.DynamicalSystem)):
       raise ValueError(type(target))
@@ -337,7 +345,7 @@ class DSRunner:
         if k == 'spike' and spike_callback:
           tmp = ''
           for i, j in enumerate(v):
-            if j == True:
+            if j is True:
               tmp += '{},{:.2f}\n'.format(i + 1, t)
           spike_callback(tmp)
         if k == 'V' and volt_callback:
@@ -345,12 +353,13 @@ class DSRunner:
           for i, j in enumerate(v):
             tmp += '{},{:.2f},{:.2f}\n'.format(i + 1, t, j)
           volt_callback(tmp)
+
     c = _callback if spike_callback or volt_callback else None
 
     self.lowref = bpl.BplRunner(
-        target=target, inputs=inputs,
-        fun_inputs=fun_inputs, dt=dt,
-        t0=t0, callback=c, **kwargs)
+      target=target, inputs=inputs,
+      fun_inputs=fun_inputs, dt=dt,
+      t0=t0, callback=c, **kwargs)
 
   def __getattr__(self, __name: str):
     return self.lowref.__getattribute__(__name)

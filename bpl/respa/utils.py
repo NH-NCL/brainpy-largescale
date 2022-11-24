@@ -20,7 +20,7 @@ def input_transform(pops: Sequence):
   for pop in pops:
     try:
       tmp = pop[0].input
-      input_trans.append((tmp, pop[1])+pop[2:])
+      input_trans.append((tmp, pop[1]) + pop[2:])
     except Exception as e:
       continue
   return input_trans

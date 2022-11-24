@@ -12,31 +12,32 @@ class ProxyNeuGroup(dyn.NeuGroup):
   """
 
   def __init__(
-      self,
-      size: Shape,
-      keep_size: bool = False,
-      name: str = None,
-      mode: Mode = normal,
+    self,
+    size: Shape,
+    keep_size: bool = False,
+    name: str = None,
+    mode: Mode = normal,
   ):
     # initialize
     super(ProxyNeuGroup, self).__init__(size=size,
-                              name=name,
-                              keep_size=keep_size,
-                              mode=mode)
+                                        name=name,
+                                        keep_size=keep_size,
+                                        mode=mode)
 
   def __getitem__(self, item):
     return ProxyNeuGroupView(target=self, index=item, keep_size=self.keep_size)
+
 
 class ProxyNeuGroupView(ProxyNeuGroup):
   """A view for a neuron group instance in multi-device enviornment."""
 
   def __init__(
-      self,
-      target: ProxyNeuGroup,
-      index: Union[slice, Sequence, Array],
-      name: str = None,
-      mode: Mode = None,
-      keep_size: bool = False
+    self,
+    target: ProxyNeuGroup,
+    index: Union[slice, Sequence, Array],
+    name: str = None,
+    mode: Mode = None,
+    keep_size: bool = False
   ):
     # check target
     if not isinstance(target, dyn.DynamicalSystem):
@@ -46,7 +47,7 @@ class ProxyNeuGroupView(ProxyNeuGroup):
     if isinstance(index, (int, slice)):
       index = (index,)
     self.index = index  # the slice
-    
+
     # check slicing
     var_shapes = target.varshape
     if len(self.index) > len(var_shapes):

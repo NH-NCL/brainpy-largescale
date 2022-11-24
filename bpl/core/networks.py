@@ -5,7 +5,8 @@ from brainpy.modes import Mode, normal
 from .base import RemoteDynamicalSystem
 from mpi4py import MPI
 import platform
-if platform.system()!='Windows':
+
+if platform.system() != 'Windows':
   import mpi4jax
 import numpy as np
 
@@ -15,19 +16,19 @@ class RemoteNetwork(dyn.Network, RemoteDynamicalSystem):
   """
 
   def __init__(
-      self,
-      *ds_tuple,
-      comm=MPI.COMM_WORLD,
-      name: str = None,
-      mode: Mode = normal,
-      **ds_dict
+    self,
+    *ds_tuple,
+    comm=MPI.COMM_WORLD,
+    name: str = None,
+    mode: Mode = normal,
+    **ds_dict
   ):
     super(RemoteNetwork, self).__init__(*ds_tuple,
-                                  name=name,
-                                  mode=mode,
-                                  **ds_dict)
+                                        name=name,
+                                        mode=mode,
+                                        **ds_dict)
     self.comm = comm
-    if self.comm == None:
+    if self.comm is None:
       self.rank = None
     else:
       self.rank = self.comm.Get_rank()
@@ -39,7 +40,7 @@ class RemoteNetwork(dyn.Network, RemoteDynamicalSystem):
     if nodes is None:
       nodes = tuple(self.nodes(level=1, include_self=False).subset(dyn.DynamicalSystem).unique().values())
     elif isinstance(nodes, dyn.DynamicalSystem):
-      nodes = (nodes, )
+      nodes = (nodes,)
     elif isinstance(nodes, dict):
       nodes = tuple(nodes.values())
     if not isinstance(nodes, (tuple, list)):
@@ -48,14 +49,14 @@ class RemoteNetwork(dyn.Network, RemoteDynamicalSystem):
       if hasattr(node, 'comm'):
         for name in node.local_delay_vars:
           if self.rank == node.source_rank:
-            if platform.system()=='Windows':
+            if platform.system() == 'Windows':
               self.comm.send(len(node.pre.spike), dest=node.target_rank, tag=2)
               self.comm.Send(node.pre.spike.to_numpy(), dest=node.target_rank, tag=3)
             else:
               token = mpi4jax.send(node.pre.spike.value, dest=node.target_rank, tag=3, comm=self.comm)
           elif self.rank == node.target_rank:
             delay = self.remote_global_delay_data[name][0]
-            if platform.system()=='Windows':
+            if platform.system() == 'Windows':
               pre_len = self.comm.recv(source=node.source_rank, tag=2)
               target = np.empty(pre_len, dtype=np.bool_)
               self.comm.Recv(target, source=node.source_rank, tag=3)
@@ -81,14 +82,14 @@ class RemoteNetwork(dyn.Network, RemoteDynamicalSystem):
       if hasattr(node, 'comm'):
         for name in node.local_delay_vars:
           if self.rank == node.source_rank:
-            if platform.system()=='Windows':
+            if platform.system() == 'Windows':
               self.comm.send(len(node.pre.spike), dest=node.target_rank, tag=4)
               self.comm.Send(node.pre.spike.to_numpy(), dest=node.target_rank, tag=5)
             else:
               token = mpi4jax.send(node.pre.spike.value, dest=node.target_rank, tag=4, comm=self.comm)
           elif self.rank == node.target_rank:
             delay = self.remote_global_delay_data[name][0]
-            if platform.system()=='Windows':
+            if platform.system() == 'Windows':
               pre_len = self.comm.recv(source=node.source_rank, tag=4)
               target = np.empty(pre_len, dtype=np.bool_)
               self.comm.Recv(target, source=node.source_rank, tag=5)
