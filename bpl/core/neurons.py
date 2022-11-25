@@ -14,31 +14,31 @@ class ProxyLIF(ProxyNeuGroup):
   """
 
   def __init__(
-      self,
-      size: Shape,
-      keep_size: bool = False,
+    self,
+    size: Shape,
+    keep_size: bool = False,
 
-      # other parameter
-      V_rest: Union[float, Array, Initializer, Callable] = 0.,
-      V_reset: Union[float, Array, Initializer, Callable] = -5.,
-      V_th: Union[float, Array, Initializer, Callable] = 20.,
-      R: Union[float, Array, Initializer, Callable] = 1.,
-      tau: Union[float, Array, Initializer, Callable] = 10.,
-      tau_ref: Optional[Union[float, Array, Initializer, Callable]] = None,
-      V_initializer: Union[Initializer, Callable, Array] = ZeroInit(),
-      noise: Optional[Union[float, Array, Initializer, Callable]] = None,
-      method: str = 'exp_auto',
-      name: Optional[str] = None,
+    # other parameter
+    V_rest: Union[float, Array, Initializer, Callable] = 0.,
+    V_reset: Union[float, Array, Initializer, Callable] = -5.,
+    V_th: Union[float, Array, Initializer, Callable] = 20.,
+    R: Union[float, Array, Initializer, Callable] = 1.,
+    tau: Union[float, Array, Initializer, Callable] = 10.,
+    tau_ref: Optional[Union[float, Array, Initializer, Callable]] = None,
+    V_initializer: Union[Initializer, Callable, Array] = ZeroInit(),
+    noise: Optional[Union[float, Array, Initializer, Callable]] = None,
+    method: str = 'exp_auto',
+    name: Optional[str] = None,
 
-      # training parameter
-      mode: Mode = normal,
-      spike_fun: Callable = bm.spike_with_sigmoid_grad,
+    # training parameter
+    mode: Mode = normal,
+    spike_fun: Callable = bm.spike_with_sigmoid_grad,
   ):
     # initialization
     super(ProxyLIF, self).__init__(size=size,
-                              name=name,
-                              keep_size=keep_size,
-                              mode=mode)
+                                   name=name,
+                                   keep_size=keep_size,
+                                   mode=mode)
     check_mode(self.mode, (TrainingMode, NormalMode), self.__class__)
 
     # parameters
@@ -62,7 +62,7 @@ class ProxyLIF(ProxyNeuGroup):
     # It is useful for JIT in multi-device enviornment.
     sp_type = bm.dftype() if isinstance(mode, TrainingMode) else bool  # the gradient of spike is a float
     self.spike = variable_(lambda s: bm.zeros(s, dtype=sp_type), self.varshape, mode)
-    
+
     if self.tau_ref is not None:
       self.t_last_spike = variable_(lambda s: bm.ones(s) * -1e7, 0, mode)
       self.refractory = variable_(lambda s: bm.zeros(s, dtype=bool), 0, mode)

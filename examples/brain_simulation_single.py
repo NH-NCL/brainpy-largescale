@@ -1,4 +1,5 @@
 import sys
+
 sys.path.append('../')
 import brainpy as bp
 
@@ -12,30 +13,31 @@ class EINet_V1(bp.dyn.Network):
     # network size
     num_exc = int(3200 * scale)
     num_inh = int(800 * scale)
-    
+
     # neurons
     pars = dict(V_rest=-60., V_th=-50., V_reset=-60., tau=20., tau_ref=5.)
 
     # synapses
     we = 0.6 / scale  # excitatory synaptic weight (voltage)
     wi = 6.7 / scale  # inhibitory synaptic weight
-    
+
     self.E1 = bp.neurons.LIF(num_exc, **pars, method=method)
     self.I1 = bp.neurons.LIF(num_inh, **pars, method=method)
-    self.E12I1 = bp.synapses.Exponential(self.E1, self.I1, 
-                                      bp.conn.FixedProb(0.02,seed=1),
-                                       output=bp.synouts.COBA(E=0.), g_max=we,
-                                       tau=5., 
-                                       method=method,
-                                       delay_step=1)
+    self.E12I1 = bp.synapses.Exponential(self.E1, self.I1,
+                                         bp.conn.FixedProb(0.02, seed=1),
+                                         output=bp.synouts.COBA(E=0.), g_max=we,
+                                         tau=5.,
+                                         method=method,
+                                         delay_step=1)
     self.I2 = bp.neurons.LIF(num_inh, **pars, method=method)
-    self.E12I2 = bp.synapses.Exponential(self.E1, self.I2, 
-                                                    bp.conn.FixedProb(0.02,seed=1), 
-                                                      output=bp.synouts.COBA(E=0.), g_max=we,
-                                                      tau=5., 
-                                                      method=method,
-                                                      delay_step=1
-                                                      )
+    self.E12I2 = bp.synapses.Exponential(self.E1, self.I2,
+                                         bp.conn.FixedProb(0.02, seed=1),
+                                         output=bp.synouts.COBA(E=0.), g_max=we,
+                                         tau=5.,
+                                         method=method,
+                                         delay_step=1
+                                         )
+
 
 def run_model_v1():
   net = EINet_V1(scale=1., method='exp_auto')
@@ -53,4 +55,3 @@ def run_model_v1():
 
 if __name__ == '__main__':
   run_model_v1()
-  

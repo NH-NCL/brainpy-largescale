@@ -26,46 +26,46 @@ if 'tests' in packages:
 
 # setup
 setup(
-    name='brainpy-largescale',
-    version=version,
-    description='brainpy-largescale depends on brainpy',
-    long_description=README,
-    long_description_content_type="text/markdown",
-    author='NanHu Neuromorphic Computing Laboratory Team',
-    author_email='nhnao@cnaeit.com',
-    packages=packages,
-    python_requires='>=3.7',
-    install_requires=['numpy>=1.15', 'jax>=0.3.0', 'tqdm', 'brainpy',
-                      'brainpylib', 'numba', 'mpi4py', 'mpi4jax', 'jax[cpu]==0.3.24'],
-    url='https://github.com/NH-NCL/brainpy-largescale',
-    project_urls={
-        "Bug Tracker": "https://github.com/NH-NCL/brainpy-largescale/issues",
-        "Documentation": "https://brainpy.readthedocs.io/",
-        "Source Code": "https://github.com/NH-NCL/brainpy-largescale",
-    },
-    keywords=('brainpy largescale, '
-              'computational neuroscience, '
-              'brain-inspired computation, '
-              'dynamical systems, '
-              'differential equations, '
-              'brain modeling, '
-              'brain dynamics modeling, '
-              'brain dynamics programming'),
-    classifiers=[
-        'Natural Language :: English',
-        'Operating System :: OS Independent',
-        'Programming Language :: Python',
-        'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.7',
-        'Programming Language :: Python :: 3.8',
-        'Programming Language :: Python :: 3.9',
-        'Programming Language :: Python :: 3.10',
-        'Intended Audience :: Science/Research',
-        'License :: OSI Approved :: Apache Software License',
-        'Topic :: Scientific/Engineering :: Bio-Informatics',
-        'Topic :: Scientific/Engineering :: Mathematics',
-        'Topic :: Scientific/Engineering :: Artificial Intelligence',
-        'Topic :: Software Development :: Libraries',
-    ],
-    license='Apache-2.0 license',
+  name='brainpy-largescale',
+  version=version,
+  description='brainpy-largescale depends on brainpy',
+  long_description=README,
+  long_description_content_type="text/markdown",
+  author='NanHu Neuromorphic Computing Laboratory Team',
+  author_email='nhnao@cnaeit.com',
+  packages=packages,
+  python_requires='>=3.7',
+  install_requires=['numpy>=1.15', 'jax>=0.3.0', 'tqdm', 'brainpy',
+                    'brainpylib', 'numba', 'mpi4py', 'mpi4jax', 'jax[cpu]==0.3.24'],
+  url='https://github.com/NH-NCL/brainpy-largescale',
+  project_urls={
+    "Bug Tracker": "https://github.com/NH-NCL/brainpy-largescale/issues",
+    "Documentation": "https://brainpy.readthedocs.io/",
+    "Source Code": "https://github.com/NH-NCL/brainpy-largescale",
+  },
+  keywords=('brainpy largescale, '
+            'computational neuroscience, '
+            'brain-inspired computation, '
+            'dynamical systems, '
+            'differential equations, '
+            'brain modeling, '
+            'brain dynamics modeling, '
+            'brain dynamics programming'),
+  classifiers=[
+    'Natural Language :: English',
+    'Operating System :: OS Independent',
+    'Programming Language :: Python',
+    'Programming Language :: Python :: 3',
+    'Programming Language :: Python :: 3.7',
+    'Programming Language :: Python :: 3.8',
+    'Programming Language :: Python :: 3.9',
+    'Programming Language :: Python :: 3.10',
+    'Intended Audience :: Science/Research',
+    'License :: OSI Approved :: Apache Software License',
+    'Topic :: Scientific/Engineering :: Bio-Informatics',
+    'Topic :: Scientific/Engineering :: Mathematics',
+    'Topic :: Scientific/Engineering :: Artificial Intelligence',
+    'Topic :: Software Development :: Libraries',
+  ],
+  license='Apache-2.0 license',
 )

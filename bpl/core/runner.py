@@ -1,8 +1,4 @@
-import time
 from typing import Dict, Union, Sequence, Callable
-
-import numpy as np
-import tqdm.auto
 from jax.tree_util import tree_map
 from jax.experimental.host_callback import id_tap
 
@@ -14,18 +10,18 @@ from brainpy.tools.others.dicts import DotDict
 
 class BplRunner(dyn.DSRunner):
   def __init__(
-      self,
-      target: dyn.DynamicalSystem,
+    self,
+    target: dyn.DynamicalSystem,
 
-      # inputs for target variables
-      inputs: Sequence = (),
-      fun_inputs: Callable = None,
+    # inputs for target variables
+    inputs: Sequence = (),
+    fun_inputs: Callable = None,
 
-      # extra info
-      dt: float = None,
-      t0: Union[float, int] = 0.,
-      callback: Callable = None,
-      **kwargs
+    # extra info
+    dt: float = None,
+    t0: Union[float, int] = 0.,
+    callback: Callable = None,
+    **kwargs
   ):
     super(BplRunner, self).__init__(
       target=target, inputs=inputs, fun_inputs=fun_inputs,
@@ -33,7 +29,8 @@ class BplRunner(dyn.DSRunner):
     self.callback = callback
 
   def f_predict(self, shared_args: Dict = None):
-    if shared_args is None: shared_args = dict()
+    if shared_args is None:
+      shared_args = dict()
 
     shared_kwargs_str = serialize_kwargs(shared_args)
     if shared_kwargs_str not in self._f_predict_compiled:

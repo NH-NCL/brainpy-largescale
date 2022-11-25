@@ -3,9 +3,10 @@ import bpl
 import brainpy as bp
 from brainpy.dyn import channels, synouts
 import brainpy.math as bm
+from .base import BaseTest
 
 
-class BaseFunctionsTestCase(unittest.TestCase):
+class BaseFunctionsTestCase(BaseTest):
   def testbasefunc(self):
     class MyNetwork(bpl.Network):
       def __init__(self, *ds_tuple):
@@ -16,8 +17,8 @@ class BaseFunctionsTestCase(unittest.TestCase):
                          tau_ref=5., method='exp_auto', V_initializer=bp.initialize.Normal(-55., 2.))
         # self.c = bpl.Exponential(ds_tuple[0], self.a, bp.conn.FixedProb(
         #     0.02), g_max=10, tau=5., output=bp.synouts.COBA(E=0.), method='exp_auto')
-        self.d = bpl.Exponential(self.a[100:], self.b, bp.conn.FixedProb(
-            0.02, seed=123), g_max=10, tau=5., output=bp.synouts.COBA(E=0.), method='exp_auto', delay_step=1)
+        self.d = bpl.Exponential(self.a, self.b, bp.conn.FixedProb(
+          0.02, seed=123), g_max=10, tau=5., output=bp.synouts.COBA(E=0.), method='exp_auto', delay_step=1)
 
     net = MyNetwork()
     net.build()
@@ -35,19 +36,19 @@ class BaseFunctionsTestCase(unittest.TestCase):
     inputs = bpl.input_transform([(net.a, 20)])
     monitors = bpl.monitor_transform([net.b])
     runner = bpl.DSRunner(
-        net,
-        monitors=monitors,
-        inputs=inputs,
-        jit=False
+      net,
+      monitors=monitors,
+      inputs=inputs,
+      jit=False
     )
-    runner.run(10.)
-    if 'spike' in runner.mon:
-      bp.visualize.raster_plot(
-          runner.mon.ts, runner.mon['spike'], show=True)
-      print(net.pops_)
-      print(net.pops_by_rank)
-      print(net.syns_)
-      # print(net.nodes())
+    runner.run(5.)
+    # if 'spike' in runner.mon:
+    #   bp.visualize.raster_plot(
+    #     runner.mon.ts, runner.mon['spike'], show=True)
+    #   print(net.pops_)
+    #   print(net.pops_by_rank)
+    #   print(net.syns_)
+    #   print(net.nodes())
 
   def testBaseNeuronregister(self):
     @bpl.register()
@@ -106,8 +107,8 @@ class BaseFunctionsTestCase(unittest.TestCase):
       net = EINet_v1(scale=1)
       net.build()
       runner = bpl.DSRunner(net, monitors={'E.spike': net.E.spike})
-      runner.run(100.)
-      bp.visualize.raster_plot(runner.mon.ts, runner.mon['E.spike'], show=True)
+      runner.run(5.)
+      # bp.visualize.raster_plot(runner.mon.ts, runner.mon['E.spike'], show=True)
 
     run_ei_v1()
 
