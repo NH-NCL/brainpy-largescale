@@ -60,7 +60,7 @@ class ProxyNeuGroupView(ProxyNeuGroup):
       if isinstance(idx, int):
         size.append(1)
       elif isinstance(idx, slice):
-        size.append(dyn._slice_to_num(idx, var_shapes[i]))
+        size.append(dyn.base._slice_to_num(idx, var_shapes[i]))
       else:
         # should be a list/tuple/array of int
         # do not check again

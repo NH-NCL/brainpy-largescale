@@ -38,7 +38,7 @@ class EINet_V1(bpl.RemoteNetwork):
       self.E1 = bpl.neurons.ProxyLIF(num_exc, **pars, method=method)
       self.I1 = bpl.neurons.ProxyLIF(num_inh, **pars, method=method)
       self.I2 = bp.neurons.LIF(num_inh, **pars, method=method)
-    self.remoteE12I2 = bpl.synapses.RemoteExponential(0, self.E1, 1, self.I2, 
+    self.remoteE12I2 = bpl.synapses.RemoteExponential(0, self.E1, 1, self.I2[:100], 
                                                     bp.conn.FixedProb(0.02,seed=1), 
                                                       output=bp.synouts.COBA(E=0.), g_max=we,
                                                       tau=5., 

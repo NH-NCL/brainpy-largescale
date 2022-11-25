@@ -29,7 +29,7 @@ class EINet_V1(bp.dyn.Network):
                                        method=method,
                                        delay_step=1)
     self.I2 = bp.neurons.LIF(num_inh, **pars, method=method)
-    self.E12I2 = bp.synapses.Exponential(self.E1, self.I2, 
+    self.E12I2 = bp.synapses.Exponential(self.E1, self.I2[:100], 
                                                     bp.conn.FixedProb(0.02,seed=1), 
                                                       output=bp.synouts.COBA(E=0.), g_max=we,
                                                       tau=5., 

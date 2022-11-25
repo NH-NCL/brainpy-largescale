@@ -20,7 +20,7 @@ if platform.system()!='Windows':
   import mpi4jax
 
 
-class RemoteExponential(dyn.synapses.Exponential, RemoteDynamicalSystem):
+class RemoteExponential(RemoteDynamicalSystem, dyn.synapses.Exponential):
   """Exponential decay synapse model in multi-device environment.
   """
 
@@ -68,22 +68,23 @@ class RemoteExponential(dyn.synapses.Exponential, RemoteDynamicalSystem):
     self.source_rank = source_rank
     self.target_rank = target_rank
     self.rank = self.comm.Get_rank()
+    self.rank_pair = 'rank'+str(self.source_rank)+'rank'+str(self.target_rank)
     if self.rank == source_rank:
-      #Make sure the same neuron group only deliver its spike one time during one step network simulation
-      if self.pre.name not in self.remote_first_send_mark:
-        self.remote_first_send_mark.append(self.pre.name)
+      # #Make sure the same neuron group only deliver its spike one time during one step network simulation
+      if self.pre.name+self.rank_pair not in self.remote_synapse_mark:
+        self.remote_synapse_mark.append(self.pre.name+self.rank_pair)
         if platform.system()=='Windows':
           self.comm.send(len(self.pre.spike), dest=target_rank, tag=0)
           self.comm.Send(self.pre.spike.to_numpy(), dest=target_rank, tag=1)
         else:
           token = mpi4jax.send(self.pre.spike.value, dest=target_rank, tag=0, comm=self.comm)
-        self.delay_step = self.remote_register_delay(f"{self.pre.name}.spike", delay_step, self.pre.spike)
+        self.delay_step = self.remote_register_delay(f"{self.pre.name+self.rank_pair}.spike", delay_step, self.pre.spike)
     elif self.rank == target_rank:
       # connections and weights
       self.g_max, self.conn_mask = self.init_weights(g_max, comp_method, sparse_data='csr')
       
-      if self.pre.name not in self.remote_first_send_mark:
-        self.remote_first_send_mark.append(self.pre.name)
+      if self.pre.name+self.rank_pair not in self.remote_synapse_mark:
+        self.remote_synapse_mark.append(self.pre.name+self.rank_pair)
         if platform.system()=='Windows':
           pre_len = self.comm.recv(source=source_rank, tag=0)
           pre_spike = np.empty(pre_len, dtype=np.bool_)
@@ -92,7 +93,8 @@ class RemoteExponential(dyn.synapses.Exponential, RemoteDynamicalSystem):
           pre_spike, token = mpi4jax.recv(pre.spike, source=source_rank, tag=0, comm=self.comm)
         self.pre_spike = bm.Variable(pre_spike)
         # variables
-        self.delay_step = self.remote_register_delay(f"{self.pre.name}.spike", delay_step, self.pre_spike)
+        self.delay_step = self.remote_register_delay(f"{self.pre.name+self.rank_pair}.spike", delay_step, self.pre_spike)
+      # variables
       self.g = variable_(bm.zeros, self.post.num, mode)
       self.integral = odeint(lambda g, t: -g / self.tau, method=method)
 
@@ -167,7 +169,7 @@ class RemoteExponential(dyn.synapses.Exponential, RemoteDynamicalSystem):
 
       # delays
       if pre_spike is None:
-        pre_spike = self.remote_get_delay_data(f"{self.pre.name}.spike", self.delay_step)
+        pre_spike = self.remote_get_delay_data(f"{self.pre.name+self.rank_pair}.spike", self.delay_step)
       if self.stop_spike_gradient:
         pre_spike = pre_spike.value if isinstance(pre_spike, bm.JaxArray) else pre_spike
         pre_spike = stop_gradient(pre_spike)
