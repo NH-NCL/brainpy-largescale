@@ -71,7 +71,8 @@ class RemoteExponential(RemoteDynamicalSystem, dyn.synapses.Exponential):
     self.rank = self.comm.Get_rank()
     self.rank_pair = 'rank' + str(self.source_rank) + 'rank' + str(self.target_rank)
     if self.rank == source_rank:
-      # Make sure the same neuron group only deliver its spike one time during one step network simulation
+      # Make sure the same neuron group only deliver its spike one time
+      # during one step network simulation between this two ranks
       if self.pre.name + self.rank_pair not in self.remote_synapse_mark:
         self.remote_synapse_mark.append(self.pre.name + self.rank_pair)
         if platform.system() == 'Windows':
@@ -80,7 +81,7 @@ class RemoteExponential(RemoteDynamicalSystem, dyn.synapses.Exponential):
         else:
           token = mpi4jax.send(self.pre.spike.value, dest=target_rank, tag=0, comm=self.comm)
         self.delay_step = self.remote_register_delay(
-            f"{self.pre.name+self.rank_pair}.spike", delay_step, self.pre.spike)
+          f"{self.pre.name+self.rank_pair}.spike", delay_step, self.pre.spike)
     elif self.rank == target_rank:
       # connections and weights
       self.g_max, self.conn_mask = self.init_weights(g_max, comp_method, sparse_data='csr')
@@ -96,7 +97,7 @@ class RemoteExponential(RemoteDynamicalSystem, dyn.synapses.Exponential):
         self.pre_spike = bm.Variable(pre_spike)
         # variables
         self.delay_step = self.remote_register_delay(
-            f"{self.pre.name+self.rank_pair}.spike", delay_step, self.pre_spike)
+          f"{self.pre.name+self.rank_pair}.spike", delay_step, self.pre_spike)
       # variables
       self.g = variable_(bm.zeros, self.post.num, mode)
       self.integral = odeint(lambda g, t: -g / self.tau, method=method)
@@ -195,7 +196,8 @@ class RemoteExponential(RemoteDynamicalSystem, dyn.synapses.Exponential):
         post_vs = self.syn2post_with_one2one(syn_value, self.g_max)
       else:
         if self.comp_method == 'sparse':
-          def f(s): return bm.pre2post_event_sum(s, self.conn_mask, self.post.num, self.g_max)
+          def f(s):
+            return bm.pre2post_event_sum(s, self.conn_mask, self.post.num, self.g_max)
           if isinstance(self.mode, BatchingMode):
             f = vmap(f)
           post_vs = f(pre_spike)
