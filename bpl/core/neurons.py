@@ -14,25 +14,25 @@ class ProxyLIF(ProxyNeuGroup):
   """
 
   def __init__(
-    self,
-    size: Shape,
-    keep_size: bool = False,
+      self,
+      size: Shape,
+      keep_size: bool = False,
 
-    # other parameter
-    V_rest: Union[float, Array, Initializer, Callable] = 0.,
-    V_reset: Union[float, Array, Initializer, Callable] = -5.,
-    V_th: Union[float, Array, Initializer, Callable] = 20.,
-    R: Union[float, Array, Initializer, Callable] = 1.,
-    tau: Union[float, Array, Initializer, Callable] = 10.,
-    tau_ref: Optional[Union[float, Array, Initializer, Callable]] = None,
-    V_initializer: Union[Initializer, Callable, Array] = ZeroInit(),
-    noise: Optional[Union[float, Array, Initializer, Callable]] = None,
-    method: str = 'exp_auto',
-    name: Optional[str] = None,
+      # other parameter
+      V_rest: Union[float, Array, Initializer, Callable] = 0.,
+      V_reset: Union[float, Array, Initializer, Callable] = -5.,
+      V_th: Union[float, Array, Initializer, Callable] = 20.,
+      R: Union[float, Array, Initializer, Callable] = 1.,
+      tau: Union[float, Array, Initializer, Callable] = 10.,
+      tau_ref: Optional[Union[float, Array, Initializer, Callable]] = None,
+      V_initializer: Union[Initializer, Callable, Array] = ZeroInit(),
+      noise: Optional[Union[float, Array, Initializer, Callable]] = None,
+      method: str = 'exp_auto',
+      name: Optional[str] = None,
 
-    # training parameter
-    mode: Mode = normal,
-    spike_fun: Callable = bm.spike_with_sigmoid_grad,
+      # training parameter
+      mode: Mode = normal,
+      spike_fun: Callable = bm.spike_with_sigmoid_grad,
   ):
     # initialization
     super(ProxyLIF, self).__init__(size=size,

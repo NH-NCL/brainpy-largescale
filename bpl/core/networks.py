@@ -16,12 +16,12 @@ class RemoteNetwork(dyn.Network, RemoteDynamicalSystem):
   """
 
   def __init__(
-    self,
-    *ds_tuple,
-    comm=MPI.COMM_WORLD,
-    name: str = None,
-    mode: Mode = normal,
-    **ds_dict
+      self,
+      *ds_tuple,
+      comm=MPI.COMM_WORLD,
+      name: str = None,
+      mode: Mode = normal,
+      **ds_dict
   ):
     super(RemoteNetwork, self).__init__(*ds_tuple,
                                         name=name,
