@@ -7,6 +7,7 @@ from typing import Union, Sequence, Callable, Tuple, Dict
 import jax.tree_util
 from .res_manager import ResManager
 import bpl
+import copy
 
 try:
   from mpi4py import MPI
@@ -36,10 +37,10 @@ class BaseNeuron:
   proxy_neurons = {}
 
   def __init__(
-    self,
-    shape: Shape,
-    *args,
-    **kwargs
+      self,
+      shape: Shape,
+      *args,
+      **kwargs
   ):
     self.args = args
     self.kwargs = kwargs
@@ -61,7 +62,7 @@ class BaseNeuron:
     return self.id == other.id
 
   def __getitem__(self, index: Union[slice, Sequence, Array]):
-    return (self, index)
+    return BaseNeuronSlice(self, index)
 
   def __getattr__(self, __name: str):
     return self.lowref.__getattribute__(__name)
@@ -73,6 +74,35 @@ class BaseNeuron:
       raise Exception("model_class should be assigned")
     self.lowref = self.model_class(self.shape, *self.args, **self.kwargs)
     return self.lowref
+
+
+class BaseNeuronSlice:
+  def __init__(self, target: Union[BaseNeuron, 'BaseNeuronSlice'], index: Union[slice, Sequence, Array]):
+    if isinstance(target, BaseNeuron):
+      self.target = target
+      self.index = [index]
+    elif isinstance(target, BaseNeuronSlice):
+      self.target = target.target
+      self.index = copy.deepcopy(target.index)
+      self.index.append(index)
+    else:
+      raise ValueError("target should be a BaseNeuronSlice or a BaseNeuron")
+
+  def build(self):
+    if '_cache' not in self.__dict__:
+      self._cache = self.target.build()
+      for idx in self.index:
+        self._cache = self._cache[idx]
+    return self._cache
+
+  def __getattr__(self, __name: str):
+    if __name in self.target.__dict__:
+      return self.target.__getattribute__(__name)
+    else:
+      return self.build().__getattribute__(__name)
+
+  def __getitem__(self, index: Union[slice, Sequence, Array]):
+    return BaseNeuronSlice(self, index)
 
 
 class register():
@@ -136,12 +166,12 @@ class register():
 class BaseSynapse:
 
   def __init__(
-    self,
-    pre: Union[BaseNeuron, Tuple[BaseNeuron, Union[slice, Sequence, Array]]],
-    post: Union[BaseNeuron, Tuple[BaseNeuron, Union[slice, Sequence, Array]]],
-    conn: Union[TwoEndConnector, Array, Dict[str, Array]],
-    *args,
-    **kwargs
+      self,
+      pre: Union[BaseNeuron, Tuple[BaseNeuron, Union[slice, Sequence, Array]]],
+      post: Union[BaseNeuron, Tuple[BaseNeuron, Union[slice, Sequence, Array]]],
+      conn: Union[TwoEndConnector, Array, Dict[str, Array]],
+      *args,
+      **kwargs
   ):
     self.pre = pre
     self.post = post
@@ -157,52 +187,48 @@ class BaseSynapse:
 
   def build(self):
     # assert self.pre.lowref is not None and self.post.lowref is not None
-    if self.lowref is not None:
+    if self.pre.pid != mpi_rank and self.post.pid != mpi_rank or self.lowref is not None:
       return self.lowref
+
     if not hasattr(self, 'model_class'):
       raise Exception("model_class should be assigned")
 
-    if isinstance(self.pre, tuple):
-      pre_pid = self.pre[0].pid
-      pre_shape = self.pre[0].shape
-      pre_slice = self.pre[1]
+    pre_pid = self.pre.pid
+    pre_shape = self.pre.shape
+    if isinstance(self.pre, BaseNeuronSlice):
+      pre_slice = self.pre.index
       if pre_pid == mpi_rank:
-        pre = self.pre[0].lowref[self.pre[1]]
+        pre = self.pre.build()
       else:
-        pre = self.pre[0]
+        pre = self.pre.target
     elif isinstance(self.pre, BaseNeuron):
-      pre_pid = self.pre.pid
-      pre_shape = self.pre.shape
       pre_slice = None
       if pre_pid == mpi_rank:
-        pre = self.pre.lowref
+        pre = self.pre.build()
       else:
         pre = self.pre
     else:
       raise ValueError(type(self.pre))
 
-    if isinstance(self.post, tuple):
-      post_pid = self.post[0].pid
-      post_shape = self.post[0].shape
-      post_slice = self.post[1]
+    post_pid = self.post.pid
+    post_shape = self.post.shape
+    if isinstance(self.post, BaseNeuronSlice):
+      post_slice = self.post.index
       if post_pid == mpi_rank:
-        post = self.post[0].lowref[self.post[1]]
+        post = self.post.build()
       else:
-        post = self.post[0]
+        post = self.post.target
     elif isinstance(self.post, BaseNeuron):
-      post_pid = self.post.pid
-      post_shape = self.post.shape
       post_slice = None
       if post_pid == mpi_rank:
-        post = self.post.lowref
+        post = self.post.build()
       else:
         post = self.post
     else:
       raise ValueError(type(self.post))
 
     if pre_pid == post_pid and pre_pid == mpi_rank:
-      self.lowref = self.model_class(
-        pre, post, self.conn, *self.args, **self.kwargs)
+      self.lowref = self.model_class(pre, post, self.conn, *self.args, **self.kwargs)
     elif pre_pid == mpi_rank:
       if post not in BaseNeuron.proxy_neurons:
         tmp_ = bpl.neurons.ProxyLIF(post_shape)
@@ -210,9 +236,9 @@ class BaseSynapse:
       else:
         tmp_ = BaseNeuron.proxy_neurons[post]
       if post_slice is not None:
-        tmp_ = tmp_[post_slice]
-      self.lowref = self.model_class_remote(
-        pre_pid, pre, post_pid, tmp_, conn=self.conn, *self.args, **self.kwargs)
+        for sli in post_slice:
+          tmp_ = tmp_[sli]
+      self.lowref = self.model_class_remote(pre_pid, pre, post_pid, tmp_, conn=self.conn, *self.args, **self.kwargs)
     elif post_pid == mpi_rank:
       if pre not in BaseNeuron.proxy_neurons:
         tmp_ = bpl.neurons.ProxyLIF(pre_shape)
@@ -220,18 +246,18 @@ class BaseSynapse:
       else:
         tmp_ = BaseNeuron.proxy_neurons[pre]
       if pre_slice is not None:
-        tmp_ = tmp_[pre_slice]
-      self.lowref = self.model_class_remote(
-        pre_pid, tmp_, post_pid, post, conn=self.conn, *self.args, **self.kwargs)
+        for sli in pre_slice:
+          tmp_ = tmp_[sli]
+      self.lowref = self.model_class_remote(pre_pid, tmp_, post_pid, post, conn=self.conn, *self.args, **self.kwargs)
     return self.lowref
 
 
 class LIF(BaseNeuron):
   def __init__(
-    self,
-    shape: Shape,
-    *args,
-    **kwargs
+      self,
+      shape: Shape,
+      *args,
+      **kwargs
   ):
     super(LIF, self).__init__(shape, *args, **kwargs)
     self.model_class = dyn.LIF
@@ -243,12 +269,12 @@ class LIF(BaseNeuron):
 
 class Exponential(BaseSynapse):
   def __init__(
-    self,
-    pre: Union[BaseNeuron, Tuple[BaseNeuron, Union[slice, Sequence, Array]]],
-    post: Union[BaseNeuron, Tuple[BaseNeuron, Union[slice, Sequence, Array]]],
-    conn: Union[TwoEndConnector, Array, Dict[str, Array]],
-    *args,
-    **kwargs
+      self,
+      pre: Union[BaseNeuron, Tuple[BaseNeuron, Union[slice, Sequence, Array]]],
+      post: Union[BaseNeuron, Tuple[BaseNeuron, Union[slice, Sequence, Array]]],
+      conn: Union[TwoEndConnector, Array, Dict[str, Array]],
+      *args,
+      **kwargs
   ):
     super().__init__(pre, post, conn, *args, **kwargs)
     self.model_class = dyn.synapses.Exponential
@@ -269,10 +295,8 @@ class Network:
       pop.build()
     for syn in ResManager.syns:
       syn.build()
-    self.lowref.register_implicit_nodes(
-      *map(lambda x: x.lowref, ResManager.pops))
-    self.lowref.register_implicit_nodes(
-      *map(lambda x: x.lowref, ResManager.syns))
+    self.lowref.register_implicit_nodes(*map(lambda x: x.lowref, ResManager.pops))
+    self.lowref.register_implicit_nodes(*map(lambda x: x.lowref, ResManager.syns))
 
   def build(self):
     self.pops_ = []
@@ -322,17 +346,17 @@ class Network:
 class DSRunner:
 
   def __init__(
-    self,
-    target: Union[dyn.DynamicalSystem, Network],
-    # inputs for target variables
-    inputs: Sequence = (),
-    fun_inputs: Callable = None,
-    # extra info
-    dt: float = None,
-    t0: Union[float, int] = 0.,
-    spike_callback: Callable = None,
-    volt_callback: Callable = None,
-    **kwargs
+      self,
+      target: Union[dyn.DynamicalSystem, Network],
+      # inputs for target variables
+      inputs: Sequence = (),
+      fun_inputs: Callable = None,
+      # extra info
+      dt: float = None,
+      t0: Union[float, int] = 0.,
+      spike_callback: Callable = None,
+      volt_callback: Callable = None,
+      **kwargs
   ):
     if not isinstance(target, (Network, dyn.DynamicalSystem)):
       raise ValueError(type(target))
@@ -356,10 +380,7 @@ class DSRunner:
 
     c = _callback if spike_callback or volt_callback else None
 
-    self.lowref = bpl.BplRunner(
-      target=target, inputs=inputs,
-      fun_inputs=fun_inputs, dt=dt,
-      t0=t0, callback=c, **kwargs)
+    self.lowref = bpl.BplRunner(target=target, inputs=inputs, fun_inputs=fun_inputs, dt=dt, t0=t0, callback=c, **kwargs)
 
   def __getattr__(self, __name: str):
     return self.lowref.__getattribute__(__name)
