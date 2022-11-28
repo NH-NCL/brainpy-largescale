@@ -85,6 +85,8 @@ class BaseNeuronSlice:
       self.target = target.target
       self.index = copy.deepcopy(target.index)
       self.index.append(index)
+    else:
+      raise ValueError("target should be a BaseNeuronSlice or a BaseNeuron")
 
   def build(self):
     if '_cache' not in self.__dict__:
@@ -185,8 +187,9 @@ class BaseSynapse:
 
   def build(self):
     # assert self.pre.lowref is not None and self.post.lowref is not None
-    if self.lowref is not None:
+    if self.pre.pid != mpi_rank and self.post.pid != mpi_rank or self.lowref is not None:
       return self.lowref
+
     if not hasattr(self, 'model_class'):
       raise Exception("model_class should be assigned")
 
