@@ -85,6 +85,8 @@ class BaseNeuronSlice:
       self.target = target.target
       self.index = copy.deepcopy(target.index)
       self.index.append(index)
+    else:
+      raise ValueError("target should be a BaseNeuronSlice or a BaseNeuron")
 
   def build(self):
     if '_cache' not in self.__dict__:
@@ -185,8 +187,9 @@ class BaseSynapse:
 
   def build(self):
     # assert self.pre.lowref is not None and self.post.lowref is not None
-    if self.lowref is not None:
+    if self.pre.pid != mpi_rank and self.post.pid != mpi_rank or self.lowref is not None:
       return self.lowref
+
     if not hasattr(self, 'model_class'):
       raise Exception("model_class should be assigned")
 
@@ -225,8 +228,7 @@ class BaseSynapse:
       raise ValueError(type(self.post))
 
     if pre_pid == post_pid and pre_pid == mpi_rank:
-      self.lowref = self.model_class(
-          pre, post, self.conn, *self.args, **self.kwargs)
+      self.lowref = self.model_class(pre, post, self.conn, *self.args, **self.kwargs)
     elif pre_pid == mpi_rank:
       if post not in BaseNeuron.proxy_neurons:
         tmp_ = bpl.neurons.ProxyLIF(post_shape)
@@ -236,8 +238,7 @@ class BaseSynapse:
       if post_slice is not None:
         for sli in post_slice:
           tmp_ = tmp_[sli]
-      self.lowref = self.model_class_remote(
-          pre_pid, pre, post_pid, tmp_, conn=self.conn, *self.args, **self.kwargs)
+      self.lowref = self.model_class_remote(pre_pid, pre, post_pid, tmp_, conn=self.conn, *self.args, **self.kwargs)
     elif post_pid == mpi_rank:
       if pre not in BaseNeuron.proxy_neurons:
         tmp_ = bpl.neurons.ProxyLIF(pre_shape)
@@ -247,8 +248,7 @@ class BaseSynapse:
       if pre_slice is not None:
         for sli in pre_slice:
           tmp_ = tmp_[sli]
-      self.lowref = self.model_class_remote(
-          pre_pid, tmp_, post_pid, post, conn=self.conn, *self.args, **self.kwargs)
+      self.lowref = self.model_class_remote(pre_pid, tmp_, post_pid, post, conn=self.conn, *self.args, **self.kwargs)
     return self.lowref
 
 
@@ -295,10 +295,8 @@ class Network:
       pop.build()
     for syn in ResManager.syns:
       syn.build()
-    self.lowref.register_implicit_nodes(
-        *map(lambda x: x.lowref, ResManager.pops))
-    self.lowref.register_implicit_nodes(
-        *map(lambda x: x.lowref, ResManager.syns))
+    self.lowref.register_implicit_nodes(*map(lambda x: x.lowref, ResManager.pops))
+    self.lowref.register_implicit_nodes(*map(lambda x: x.lowref, ResManager.syns))
 
   def build(self):
     self.pops_ = []
@@ -382,10 +380,7 @@ class DSRunner:
 
     c = _callback if spike_callback or volt_callback else None
 
-    self.lowref = bpl.BplRunner(
-        target=target, inputs=inputs,
-        fun_inputs=fun_inputs, dt=dt,
-        t0=t0, callback=c, **kwargs)
+    self.lowref = bpl.BplRunner(target=target, inputs=inputs, fun_inputs=fun_inputs, dt=dt, t0=t0, callback=c, **kwargs)
 
   def __getattr__(self, __name: str):
     return self.lowref.__getattribute__(__name)
