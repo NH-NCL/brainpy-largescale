@@ -89,7 +89,7 @@ class Network(dyn.Network, DynamicalSystem):
             else:
               token = mpi4jax.send(node.synapse_instance.pre.spike.value, dest=node.target_rank, tag=4, comm=self.comm)
           elif self.rank == node.target_rank:
-            delay = self.remote_global_delay_data[name][0]
+            delay = node.remote_global_delay_data[name][0]
             if platform.system() == 'Windows':
               pre_len = self.comm.recv(source=node.source_rank, tag=4)
               target = np.empty(pre_len, dtype=np.bool_)
