@@ -4,7 +4,7 @@ from brainpy.base.base import Base
 import gc
 
 
-class RemoteDynamicalSystem(Base):
+class DynamicalSystem(Base):
   '''These variable is used in multi-device enviornment.'''
   remote_global_delay_data: Dict[str, Tuple[Union[bm.LengthDelay, None], bm.Variable]] = dict()
 
@@ -15,7 +15,7 @@ class RemoteDynamicalSystem(Base):
 
     This function is used to pop out the variables which registered in global delay data and remote_global_delay_data.
     """
-    if not hasattr(self, 'comm'):
+    if hasattr(self, 'comm'):
       if hasattr(self, 'local_delay_vars'):
         for key in tuple(self.local_delay_vars.keys()):
           val = self.remote_global_delay_data.pop(key)

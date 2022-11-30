@@ -4,9 +4,11 @@ import brainpy as bp
 from brainpy.dyn import channels, synouts
 import brainpy.math as bm
 from .base import BaseTest
+import pytest
 
 
 class BaseFunctionsTestCase(BaseTest):
+  @pytest.mark.skip(reason="Unable to specify several processes")
   def testbasefunc(self):
     class MyNetwork(bpl.Network):
       def __init__(self, *ds_tuple):
@@ -50,6 +52,7 @@ class BaseFunctionsTestCase(BaseTest):
     #   print(net.syns_)
     #   print(net.nodes())
 
+  @pytest.mark.skip(reason="Unable to specify several processes")
   def testBaseNeuronregister(self):
     @bpl.register()
     class HH(bp.dyn.CondNeuGroup):
