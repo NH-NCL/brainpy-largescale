@@ -1,15 +1,16 @@
-import os
-import brainpy as bp
 import sys
+
 sys.path.append('../')
 import bpl
+import brainpy as bp
+import os
 
 os.environ['CUDA_VISIBLE_DEVICES'] = "1"
 
 bp.math.set_platform('cpu')
 
 
-class EINet_V1(bpl.Network):
+class EINet_V1(bpl.RemoteNetwork):
   def __init__(self, scale=1.0, method='exp_auto'):
     super(EINet_V1, self).__init__()
 
@@ -33,20 +34,28 @@ class EINet_V1(bpl.Network):
                                            tau=5.,
                                            method=method,
                                            delay_step=1)
-      self.I2 = bpl.neurons.ProxyNeuronGroup(num_inh, **pars, method=method)
+      self.I2 = bpl.neurons.ProxyLIF(num_inh, **pars, method=method)
     elif self.rank == 1:
-      self.E1 = bpl.neurons.ProxyNeuronGroup(num_exc, **pars, method=method)
-      self.I1 = bpl.neurons.ProxyNeuronGroup(num_inh, **pars, method=method)
+      self.E1 = bpl.neurons.ProxyLIF(num_exc, **pars, method=method)
+      self.I1 = bpl.neurons.ProxyLIF(num_inh, **pars, method=method)
       self.I2 = bp.neurons.LIF(num_inh, **pars, method=method)
-    self.remoteE12I2 = bpl.synapses.RemoteSynapse(synapse_class=bp.synapses.Exponential, param_dict=dict(pre=self.E1[:100], post=self.I2[:100],
-                                                                                                         conn=bp.conn.FixedProb(0.02, seed=1), output=bp.synouts.COBA(E=0.), g_max=we, tau=5., method=method, delay_step=1),
-                                                  source_rank=0, target_rank=1
-                                                  )
+    self.remoteE12I2 = bpl.synapses.RemoteExponential(0, self.E1, 1, self.I2,
+                                                      bp.conn.FixedProb(0.02, seed=1),
+                                                      output=bp.synouts.COBA(E=0.), g_max=we,
+                                                      tau=5.,
+                                                      method=method,
+                                                      delay_step=1
+                                                      )
 
 
 def run_model_v1():
   net = EINet_V1(scale=1., method='exp_auto')
-  runner = bp.dyn.DSRunner(net, monitors={'I2.spike': net.I2.spike}, inputs=[(net.E1.input, 200.), (net.I1.input, 200.)], jit=True)
+  runner = bp.dyn.DSRunner(
+    net,
+    monitors={'I2.spike': net.I2.spike},
+    inputs=[(net.E1.input, 200.), (net.I1.input, 200.)],
+    jit=True
+  )
   runner.run(10.)
 
   if net.rank == 1:

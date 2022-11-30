@@ -1,13 +1,18 @@
-from typing import Union, Callable, Optional
+from typing import Union, Dict, Callable, Optional
 
+from jax import vmap
+from jax.lax import stop_gradient
 
 import brainpy.math as bm
+from brainpy.connect import TwoEndConnector, All2All, One2One
 from brainpy import dyn
-from brainpy.initialize import Initializer, parameter
+from brainpy.initialize import Initializer, variable_, parameter
+from brainpy.integrators import odeint
+from brainpy.modes import Mode, BatchingMode, normal
 from brainpy.types import Array
-from brainpy.dyn.base import TwoEndConn
+from brainpy.dyn.synouts import CUBA
 import numpy as np
-from bpl.core.base import DynamicalSystem
+from bpl.core.base import RemoteDynamicalSystem
 from mpi4py import MPI
 import jax.numpy as jnp
 import platform
@@ -16,102 +21,86 @@ if platform.system() != 'Windows':
   import mpi4jax
 
 
-class RemoteSynapse(DynamicalSystem, dyn.base.TwoEndConn):
-  """Remote synapse model in multi-device environment.
-  This class is a wrapper which can run the given specific synapse model between 2 ranks.
-
-  Parameters
-  -------
-  synapse_class: TwoEndConn
-      Given specific synapse model class.
-  param_dict: dict(python3.7 and follow-up version), OrderedDict
-      A dict contains parameters which is needed by synapse_class.
-  source_rank: int
-      The rank id which pre neuron group is located in.
-  target_rank: int
-      The rank id which post neuron group is located in.
-  comm: mpi4py.MPI.Intracomm
-      Communicators object in mpi4py package.
+class RemoteExponential(RemoteDynamicalSystem, dyn.synapses.Exponential):
+  """Exponential decay synapse model in multi-device environment.
   """
 
   def __init__(
       self,
-      synapse_class,
-      param_dict,
       source_rank,
+      pre: dyn.NeuGroup,
       target_rank,
-      comm=MPI.COMM_WORLD
+      post: dyn.NeuGroup,
+      conn: Union[TwoEndConnector, Array, Dict[str, Array]],
+      comm=MPI.COMM_WORLD,
+      output: dyn.SynOut = CUBA(),
+      stp: Optional[dyn.SynSTP] = None,
+      comp_method: str = 'sparse',
+      g_max: Union[float, Array, Initializer, Callable] = 1.,
+      delay_step: Union[int, Array, Initializer, Callable] = None,
+      tau: Union[float, Array] = 8.0,
+      method: str = 'exp_auto',
+
+      # other parameters
+      name: str = None,
+      mode: Mode = normal,
+      stop_spike_gradient: bool = False,
+
   ):
-    # Make sure RemoteSynapse can work correctly.
-    if not issubclass(synapse_class, TwoEndConn):
-      raise Exception('synapse_class should be a subclass (not a instance of class) of brainpy.dyn.base.TwoEndConn.')
-    count = 3
-    for k, v in param_dict.items():
-      if (count == 3 and k != 'pre') or (count == 2 and k != 'post') or (count == 1 and k != 'conn'):
-        raise Exception('First 3 keys in param_dict must be pre post and conn in order.')
-      count -= 1
-    if count > 0:
-      raise Exception('At least 3 items should be given to param_dict and first 3 keys in param_dict must be pre post and conn in order.')
+    super(RemoteExponential, self).__init__(pre=pre,
+                                            post=post,
+                                            conn=conn,
+                                            output=output,
+                                            stp=stp,
+                                            name=name,
+                                            mode=mode,
+                                            )
+    # parameters
+    self.stop_spike_gradient = stop_spike_gradient
+    self.comp_method = comp_method
+    self.tau = tau
+    if bm.size(self.tau) != 1:
+      raise ValueError(f'"tau" must be a scalar or a tensor with size of 1. But we got {self.tau}')
 
-    super(RemoteSynapse, self).__init__(param_dict['pre'], param_dict['post'], param_dict['conn'])
-    # Create a new class because some class method will change in the following code.
-    # Below code can prevent origin class from being affected.
-
-    class sub_synapse_class(DynamicalSystem, synapse_class):
-      pass
-    self.synapse_class = sub_synapse_class
+    # # connections and weights
+    # self.g_max, self.conn_mask = self.init_weights(g_max, comp_method, sparse_data='csr')
 
     self.comm = comm
     self.source_rank = source_rank
     self.target_rank = target_rank
     self.rank = self.comm.Get_rank()
     self.rank_pair = 'rank' + str(self.source_rank) + 'rank' + str(self.target_rank)
-    # Replace some function to save place or make synapse work in muti-device enviornment
-    self.synapse_class.register_delay = self.remote_register_delay
-
     if self.rank == source_rank:
       # Make sure the same neuron group only deliver its spike one time
       # during one step network simulation between this two ranks
-      check_name = param_dict['pre'].name + self.rank_pair
-      if check_name not in self.remote_synapse_mark:
-        self.remote_synapse_mark.append(check_name)
-        # Replace some function to save place or make synapse work in muti-device enviornment
-
-        def source_rank_init_weights(*para, **dict):
-          return None, None
-        self.synapse_class.init_weights = source_rank_init_weights
-
-        def variable_(*param, **dict):
-          return None
-
-        def odeint(*param, **dict):
-          return None
-        # send
+      if self.pre.name + self.rank_pair not in self.remote_synapse_mark:
+        self.remote_synapse_mark.append(self.pre.name + self.rank_pair)
         if platform.system() == 'Windows':
-          self.comm.send(len(param_dict['pre'].spike), dest=target_rank, tag=0)
-          self.comm.Send(param_dict['pre'].spike.to_numpy(), dest=target_rank, tag=1)
+          self.comm.send(len(self.pre.spike), dest=target_rank, tag=0)
+          self.comm.Send(self.pre.spike.to_numpy(), dest=target_rank, tag=1)
         else:
-          token = mpi4jax.send(param_dict['pre'].spike.value, dest=target_rank, tag=0, comm=self.comm)
-        # initialize
-        self.synapse_instance = self.synapse_class(**param_dict)
-
+          token = mpi4jax.send(self.pre.spike.value, dest=target_rank, tag=0, comm=self.comm)
+        self.delay_step = self.remote_register_delay(
+          f"{self.pre.name+self.rank_pair}.spike", delay_step, self.pre.spike)
     elif self.rank == target_rank:
-      param_dict['pre'].name = param_dict['pre'].name + self.rank_pair
-      if param_dict['pre'].name not in self.remote_synapse_mark:
-        self.remote_synapse_mark.append(param_dict['pre'].name)
-        # Replace some function to save place or make synapse work in muti-device enviornment
-        self.synapse_class.get_delay_data = self.remote_get_delay_data
-        # receive
+      # connections and weights
+      self.g_max, self.conn_mask = self.init_weights(g_max, comp_method, sparse_data='csr')
+
+      if self.pre.name + self.rank_pair not in self.remote_synapse_mark:
+        self.remote_synapse_mark.append(self.pre.name + self.rank_pair)
         if platform.system() == 'Windows':
           pre_len = self.comm.recv(source=source_rank, tag=0)
           pre_spike = np.empty(pre_len, dtype=np.bool_)
           self.comm.Recv(pre_spike, source=source_rank, tag=1)
         else:
-          pre_spike, token = mpi4jax.recv(param_dict['pre'].spike.value, source=source_rank, tag=0, comm=self.comm)
-        # self.pre.spike should catch the spike data sent from source rank.
-        param_dict['pre'].spike = bm.Variable(pre_spike)
-        # initialize
-        self.synapse_instance = self.synapse_class(**param_dict)
+          pre_spike, token = mpi4jax.recv(pre.spike, source=source_rank, tag=0, comm=self.comm)
+        self.pre_spike = bm.Variable(pre_spike)
+        # variables
+        self.delay_step = self.remote_register_delay(
+          f"{self.pre.name+self.rank_pair}.spike", delay_step, self.pre_spike)
+      # variables
+      self.g = variable_(bm.zeros, self.post.num, mode)
+      self.integral = odeint(lambda g, t: -g / self.tau, method=method)
 
   def remote_register_delay(
       self,
@@ -122,7 +111,6 @@ class RemoteSynapse(DynamicalSystem, dyn.base.TwoEndConn):
   ):
     """Register delay variable in multi-device enviornmrnt.
     """
-    identifier = identifier + self.rank_pair
     # delay steps
     if delay_step is None:
       delay_type = 'none'
@@ -179,6 +167,52 @@ class RemoteSynapse(DynamicalSystem, dyn.base.TwoEndConn):
     self.register_implicit_nodes(self.local_delay_vars)
     return delay_step
 
+  def update(self, tdi, pre_spike=None):
+    if self.rank == self.target_rank:
+      t, dt = tdi['t'], tdi['dt']
+
+      # delays
+      if pre_spike is None:
+        pre_spike = self.remote_get_delay_data(f"{self.pre.name+self.rank_pair}.spike", self.delay_step)
+      if self.stop_spike_gradient:
+        pre_spike = pre_spike.value if isinstance(pre_spike, bm.JaxArray) else pre_spike
+        pre_spike = stop_gradient(pre_spike)
+
+      # update sub-components
+      self.output.update(tdi)
+      if self.stp is not None:
+        self.stp.update(tdi, pre_spike)
+
+      # post values
+      if isinstance(self.conn, All2All):
+        syn_value = bm.asarray(pre_spike, dtype=bm.dftype())
+        if self.stp is not None:
+          syn_value = self.stp(syn_value)
+        post_vs = self.syn2post_with_all2all(syn_value, self.g_max)
+      elif isinstance(self.conn, One2One):
+        syn_value = bm.asarray(pre_spike, dtype=bm.dftype())
+        if self.stp is not None:
+          syn_value = self.stp(syn_value)
+        post_vs = self.syn2post_with_one2one(syn_value, self.g_max)
+      else:
+        if self.comp_method == 'sparse':
+          def f(s):
+            return bm.pre2post_event_sum(s, self.conn_mask, self.post.num, self.g_max)
+          if isinstance(self.mode, BatchingMode):
+            f = vmap(f)
+          post_vs = f(pre_spike)
+          # if not isinstance(self.stp, _NullSynSTP):
+          #   raise NotImplementedError()
+        else:
+          syn_value = bm.asarray(pre_spike, dtype=bm.dftype())
+          if self.stp is not None:
+            syn_value = self.stp(syn_value)
+          post_vs = self.syn2post_with_dense(syn_value, self.g_max, self.conn_mask)
+      # updates
+      self.g.value = self.integral(self.g.value, t, dt) + post_vs
+      # output
+      return self.output(self.g)
+
   def remote_get_delay_data(
       self,
       identifier: str,
@@ -187,7 +221,6 @@ class RemoteSynapse(DynamicalSystem, dyn.base.TwoEndConn):
   ):
     """Get delay data according to the provided delay steps in multi-device enviornment.
     """
-    identifier = identifier + self.rank_pair
     if delay_step is None:
       if bm.ndim(delay_step) == 0:
         return self.remote_global_delay_data[identifier][0](0, *indices)
@@ -214,8 +247,3 @@ class RemoteSynapse(DynamicalSystem, dyn.base.TwoEndConn):
 
     else:
       raise ValueError(f'{identifier} is not defined in delay variables.')
-
-  def update(self, tdi, pre_spike=None):
-    if self.rank == self.target_rank:
-      self.synapse_instance.update(tdi, pre_spike)
-    # pass
