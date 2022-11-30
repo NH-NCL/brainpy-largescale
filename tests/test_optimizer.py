@@ -4,9 +4,11 @@ import bpl
 import brainpy as bp
 import numpy as np
 from .base import BaseTest
+import pytest
 
 
 class TestOptimizer(BaseTest):
+  @pytest.mark.skip(reason="Unable to specify several processes")
   def test_get_edge_weight_matrix(self):
     a = bpl.LIF(2, V_rest=-60., V_th=-50., V_reset=-60., tau=20.,
                 tau_ref=5., method='exp_auto')
