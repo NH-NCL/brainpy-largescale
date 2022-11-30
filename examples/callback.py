@@ -1,5 +1,9 @@
+import sys
+sys.path.append('../')
+
 import bpl
 import brainpy as bp
+from typing import List, Tuple
 
 
 class MyNetwork(bpl.Network):
@@ -25,12 +29,12 @@ monitors.update(monitor_spike)
 monitors.update(monitor_volt)
 
 
-def spike(s: str):
-  print(s)
+def spike(a: List[Tuple[int, float]]):
+  print(a)
 
 
-def volt(s: str):
-  print(s)
+def volt(a: List[Tuple[int, float, float]]):
+  print(a)
 
 
 runner = bpl.DSRunner(
