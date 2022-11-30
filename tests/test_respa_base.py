@@ -4,6 +4,7 @@ import brainpy as bp
 from brainpy.dyn import channels, synouts
 import brainpy.math as bm
 from .base import BaseTest
+import pytest
 
 
 class BaseFunctionsTestCase(BaseTest):
