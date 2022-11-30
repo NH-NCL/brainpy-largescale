@@ -1,17 +1,11 @@
 import unittest
-import sys
-sys.path.append('../')
 import bpl
-import os
-import pytest
-import brainpy.math as bm
 import brainpy as bp
+import brainpy.math as bm
+import pytest
 
 
-os.environ['CUDA_VISIBLE_DEVICES'] = "1"
-
-
-class EINet_V1(bpl.Network):
+class EINet_V1(bpl.RemoteNetwork):
   def __init__(self, scale=1.0, method='exp_auto', delay_step=None):
     super(EINet_V1, self).__init__()
 
@@ -33,66 +27,66 @@ class EINet_V1(bpl.Network):
                                            output=bp.synouts.COBA(E=0.), g_max=we,
                                            tau=5.,
                                            method=method, delay_step=delay_step)
-      self.I2 = bpl.neurons.ProxyNeuronGroup(num_inh, **pars, method=method)
-      self.I3 = bpl.neurons.ProxyNeuronGroup(num_inh, **pars, method=method)
-      self.I4 = bpl.neurons.ProxyNeuronGroup(num_inh, **pars, method=method)
-      self.I5 = bpl.neurons.ProxyNeuronGroup(num_inh, **pars, method=method)
+      self.I2 = bpl.neurons.ProxyLIF(num_inh, **pars, method=method)
+      self.I3 = bpl.neurons.ProxyLIF(num_inh, **pars, method=method)
+      self.I4 = bpl.neurons.ProxyLIF(num_inh, **pars, method=method)
+      self.I5 = bpl.neurons.ProxyLIF(num_inh, **pars, method=method)
     elif self.rank == 1:
-      self.E1 = bpl.neurons.ProxyNeuronGroup(num_exc, **pars, method=method)
-      self.I1 = bpl.neurons.ProxyNeuronGroup(num_inh, **pars, method=method)
+      self.E1 = bpl.neurons.ProxyLIF(num_exc, **pars, method=method)
+      self.I1 = bpl.neurons.ProxyLIF(num_inh, **pars, method=method)
       self.I2 = bp.neurons.LIF(num_inh, **pars, method=method)
       self.I3 = bp.neurons.LIF(num_inh, **pars, method=method)
-      self.I4 = bpl.neurons.ProxyNeuronGroup(num_inh, **pars, method=method)
-      self.I5 = bpl.neurons.ProxyNeuronGroup(num_inh, **pars, method=method)
+      self.I4 = bpl.neurons.ProxyLIF(num_inh, **pars, method=method)
+      self.I5 = bpl.neurons.ProxyLIF(num_inh, **pars, method=method)
     elif self.rank == 2:
-      self.E1 = bpl.neurons.ProxyNeuronGroup(num_exc, **pars, method=method)
-      self.I1 = bpl.neurons.ProxyNeuronGroup(num_inh, **pars, method=method)
-      self.I2 = bpl.neurons.ProxyNeuronGroup(num_inh, **pars, method=method)
-      self.I3 = bpl.neurons.ProxyNeuronGroup(num_inh, **pars, method=method)
+      self.E1 = bpl.neurons.ProxyLIF(num_exc, **pars, method=method)
+      self.I1 = bpl.neurons.ProxyLIF(num_inh, **pars, method=method)
+      self.I2 = bpl.neurons.ProxyLIF(num_inh, **pars, method=method)
+      self.I3 = bpl.neurons.ProxyLIF(num_inh, **pars, method=method)
       self.I4 = bp.neurons.LIF(num_inh, **pars, method=method)
-      self.I5 = bpl.neurons.ProxyNeuronGroup(num_inh, **pars, method=method)
+      self.I5 = bpl.neurons.ProxyLIF(num_inh, **pars, method=method)
     elif self.rank == 3:
-      self.E1 = bpl.neurons.ProxyNeuronGroup(num_exc, **pars, method=method)
-      self.I1 = bpl.neurons.ProxyNeuronGroup(num_inh, **pars, method=method)
-      self.I2 = bpl.neurons.ProxyNeuronGroup(num_inh, **pars, method=method)
-      self.I3 = bpl.neurons.ProxyNeuronGroup(num_inh, **pars, method=method)
-      self.I4 = bpl.neurons.ProxyNeuronGroup(num_inh, **pars, method=method)
+      self.E1 = bpl.neurons.ProxyLIF(num_exc, **pars, method=method)
+      self.I1 = bpl.neurons.ProxyLIF(num_inh, **pars, method=method)
+      self.I2 = bpl.neurons.ProxyLIF(num_inh, **pars, method=method)
+      self.I3 = bpl.neurons.ProxyLIF(num_inh, **pars, method=method)
+      self.I4 = bpl.neurons.ProxyLIF(num_inh, **pars, method=method)
       self.I5 = bp.neurons.LIF(num_inh, **pars, method=method)
-    self.remoteE12I2 = bpl.synapses.RemoteSynapse(synapse_class=bp.synapses.Exponential, param_dict=dict(pre=self.E1, post=self.I2,
-                                                                                                         conn=bp.conn.FixedProb(0.02, seed=1),
-                                                                                                         output=bp.synouts.COBA(E=0.), g_max=we,
-                                                                                                         tau=5.,
-                                                                                                         method=method,
-                                                                                                         delay_step=delay_step), source_rank=0, target_rank=1
-                                                  )
-    self.remoteE12I3 = bpl.synapses.RemoteSynapse(synapse_class=bp.synapses.Exponential, param_dict=dict(pre=self.E1, post=self.I3,
-                                                                                                         conn=bp.conn.FixedProb(0.02, seed=1),
-                                                                                                         output=bp.synouts.COBA(E=0.), g_max=we,
-                                                                                                         tau=5.,
-                                                                                                         method=method,
-                                                                                                         delay_step=delay_step), source_rank=0, target_rank=1
-                                                  )
-    self.remoteE12I4 = bpl.synapses.RemoteSynapse(synapse_class=bp.synapses.Exponential, param_dict=dict(pre=self.E1, post=self.I4,
-                                                                                                         conn=bp.conn.FixedProb(0.02, seed=1),
-                                                                                                         output=bp.synouts.COBA(E=0.), g_max=we,
-                                                                                                         tau=5.,
-                                                                                                         method=method,
-                                                                                                         delay_step=delay_step), source_rank=0, target_rank=2
-                                                  )
-    self.remoteE12I5 = bpl.synapses.RemoteSynapse(synapse_class=bp.synapses.Exponential, param_dict=dict(pre=self.E1[:100], post=self.I5[:100],
-                                                                                                         conn=bp.conn.FixedProb(0.02, seed=1), 
-                                                                                                         output=bp.synouts.COBA(E=0.), g_max=we, 
-                                                                                                         tau=5., 
-                                                                                                         method=method, 
-                                                                                                         delay_step=delay_step), source_rank=0, target_rank=3
-                                                  )
-    self.remoteI42I5 = bpl.synapses.RemoteSynapse(synapse_class=bp.synapses.Exponential, param_dict=dict(pre=self.I4, post=self.I5[:100],
-                                                                                                         conn=bp.conn.FixedProb(0.02, seed=1),
-                                                                                                         output=bp.synouts.COBA(E=0.), g_max=wi,
-                                                                                                         tau=5.,
-                                                                                                         method=method,
-                                                                                                         delay_step=delay_step), source_rank=2, target_rank=3
-                                                  )
+    self.remoteE12I2 = bpl.synapses.RemoteExponential(0, self.E1, 1, self.I2,
+                                                      bp.conn.FixedProb(0.02, seed=1),
+                                                      output=bp.synouts.COBA(E=0.), g_max=we,
+                                                      tau=5.,
+                                                      method=method,
+                                                      delay_step=delay_step
+                                                      )
+    self.remoteE12I3 = bpl.synapses.RemoteExponential(0, self.E1, 1, self.I3,
+                                                      bp.conn.FixedProb(0.02, seed=1),
+                                                      output=bp.synouts.COBA(E=0.), g_max=we,
+                                                      tau=5.,
+                                                      method=method,
+                                                      delay_step=delay_step
+                                                      )
+    self.remoteE12I4 = bpl.synapses.RemoteExponential(0, self.E1, 2, self.I4,
+                                                      bp.conn.FixedProb(0.02, seed=1),
+                                                      output=bp.synouts.COBA(E=0.), g_max=we,
+                                                      tau=5.,
+                                                      method=method,
+                                                      delay_step=delay_step
+                                                      )
+    self.remoteE12I5 = bpl.synapses.RemoteExponential(0, self.E1[:100], 3, self.I5[:100],
+                                                      bp.conn.FixedProb(0.02, seed=1),
+                                                      output=bp.synouts.COBA(E=0.), g_max=we,
+                                                      tau=5.,
+                                                      method=method,
+                                                      delay_step=delay_step
+                                                      )
+    self.remoteI42I5 = bpl.synapses.RemoteExponential(2, self.I4, 3, self.I5[:100],
+                                                      bp.conn.FixedProb(0.02, seed=1),
+                                                      output=bp.synouts.COBA(E=0.), g_max=wi,
+                                                      tau=5.,
+                                                      method=method,
+                                                      delay_step=delay_step
+                                                      )
 
 
 class MPITestCase(unittest.TestCase):

@@ -3,12 +3,13 @@ from typing import Union, Callable, Optional
 import brainpy.math as bm
 from bpl.core.neurons_base import ProxyNeuGroup
 from brainpy.initialize import (ZeroInit, Initializer,
-                                parameter, variable_)
+                                parameter, variable_, noise as init_noise)
 from brainpy.modes import Mode, NormalMode, TrainingMode, normal, check_mode
+from brainpy.tools.checking import check_initializer, check_callable
 from brainpy.types import Shape, Array
 
 
-class ProxyNeuronGroup(ProxyNeuGroup):
+class ProxyLIF(ProxyNeuGroup):
   r"""Leaky integrate-and-fire neuron model in multi-device enviornment.
   """
 
@@ -34,29 +35,28 @@ class ProxyNeuronGroup(ProxyNeuGroup):
       spike_fun: Callable = bm.spike_with_sigmoid_grad,
   ):
     # initialization
-    super(ProxyNeuronGroup, self).__init__(size=size,
-                                           name=name,
-                                           keep_size=keep_size,
-                                           mode=mode)
+    super(ProxyLIF, self).__init__(size=size,
+                                   name=name,
+                                   keep_size=keep_size,
+                                   mode=mode)
     check_mode(self.mode, (TrainingMode, NormalMode), self.__class__)
 
     # parameters
-    # self.V_rest = parameter(V_rest, 0, allow_none=False)
-    # self.V_reset = parameter(V_reset, 0, allow_none=False)
-    # self.V_th = parameter(V_th, 0, allow_none=False)
-    # self.tau = parameter(tau, 0, allow_none=False)
-    # self.R = parameter(R, 0, allow_none=False)
+    self.V_rest = parameter(V_rest, 0, allow_none=False)
+    self.V_reset = parameter(V_reset, 0, allow_none=False)
+    self.V_th = parameter(V_th, 0, allow_none=False)
+    self.tau = parameter(tau, 0, allow_none=False)
+    self.R = parameter(R, 0, allow_none=False)
     self.tau_ref = parameter(tau_ref, 0, allow_none=True)
-    # self.noise = init_noise(noise, 0)
-    # self.spike_fun = check_callable(spike_fun, 'spike_fun')
+    self.noise = init_noise(noise, 0)
+    self.spike_fun = check_callable(spike_fun, 'spike_fun')
 
     # initializers
-    # check_initializer(V_initializer, 'V_initializer')
-    # self._V_initializer = V_initializer
+    check_initializer(V_initializer, 'V_initializer')
+    self._V_initializer = V_initializer
 
     # variables
-    # self.V = variable_(V_initializer, 0, mode)
-    self.V = variable_(bm.zeros, 0, mode)
+    self.V = variable_(self._V_initializer, 0, mode)
     self.input = variable_(bm.zeros, 0, mode)
     # Make sure the 'spike' attribute is consistent with real neuron group
     # It is useful for JIT in multi-device enviornment.

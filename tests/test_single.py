@@ -1,12 +1,10 @@
 import unittest
-import sys
-sys.path.append('../')
 import bpl
 import brainpy as bp
 import brainpy.math as bm
 
 
-class EINet_V1(bpl.Network):
+class EINet_V1(bpl.RemoteNetwork):
   def __init__(self, scale=1.0, method='exp_auto', delay_step=None):
     super(EINet_V1, self).__init__()
 
