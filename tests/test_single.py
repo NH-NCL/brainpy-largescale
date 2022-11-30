@@ -1,4 +1,6 @@
 import unittest
+import sys
+sys.path.append('../')
 import bpl
 import brainpy as bp
 import brainpy.math as bm

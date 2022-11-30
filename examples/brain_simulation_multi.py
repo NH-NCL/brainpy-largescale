@@ -1,9 +1,8 @@
 import os
 import brainpy as bp
-import bpl
 import sys
-
 sys.path.append('../')
+import bpl
 
 os.environ['CUDA_VISIBLE_DEVICES'] = "1"
 
