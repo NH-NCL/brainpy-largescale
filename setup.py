@@ -35,7 +35,7 @@ setup(
   author_email='nhnao@cnaeit.com',
   packages=packages,
   python_requires='>=3.7',
-  install_requires=['numpy>=1.15', 'jax>=0.3.0', 'tqdm', 'brainpy',
+  install_requires=['numpy>=1.15', 'tqdm', 'brainpy',
                     'brainpylib', 'numba', 'mpi4py', 'mpi4jax', 'jax[cpu]==0.3.24'],
   url='https://github.com/NH-NCL/brainpy-largescale',
   project_urls={
