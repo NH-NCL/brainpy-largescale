@@ -367,16 +367,16 @@ class DSRunner:
     def _callback(t: float, d: dict):
       for k, v in d.items():
         if k == 'spike' and spike_callback:
-          tmp = ''
+          a = []
           for i, j in enumerate(v):
             if j is True:
-              tmp += '{},{:.2f}\n'.format(i + 1, t)
-          spike_callback(tmp)
+              a.append((i + 1, t))
+          spike_callback(a)
         if k == 'V' and volt_callback:
-          tmp = ''
+          a = []
           for i, j in enumerate(v):
-            tmp += '{},{:.2f},{:.2f}\n'.format(i + 1, t, j)
-          volt_callback(tmp)
+            a.append((i + 1, t, j))
+          volt_callback(a)
 
     c = _callback if spike_callback or volt_callback else None
 
