@@ -4,13 +4,13 @@ import brainpy as bp
 from brainpy.dyn import channels, synouts
 import brainpy.math as bm
 from .base import BaseTest
-import pytest
+# import pytest
 
 
 class BaseFunctionsTestCase(BaseTest):
-  @pytest.mark.skip(reason="Unable to specify several processes")
+  # @pytest.mark.skip(reason="Unable to specify several processes")
   def testbasefunc(self):
-    class MyNetwork(bpl.Network):
+    class MyNetwork(bpl.respa.Network):
       def __init__(self, *ds_tuple):
         super(MyNetwork, self).__init__(ds_tuple)
         self.a = bpl.LIF(3200, V_rest=-60., V_th=-50., V_reset=-60., tau=20.,
@@ -44,16 +44,16 @@ class BaseFunctionsTestCase(BaseTest):
       jit=False
     )
     runner.run(5.)
-    # if 'spike' in runner.mon:
-    #   bp.visualize.raster_plot(
-    #     runner.mon.ts, runner.mon['spike'], show=True)
-    #   print(net.pops_)
-    #   print(net.pops_by_rank)
-    #   print(net.syns_)
-    #   print(net.nodes())
+    if 'spike' in runner.mon:
+      # bp.visualize.raster_plot(
+      #   runner.mon.ts, runner.mon['spike'], show=True)
+      #   print(net.pops_)
+      print(net.pops_by_rank)
+      #   print(net.syns_)
+      #   print(net.nodes())
 
-  @pytest.mark.skip(reason="Unable to specify several processes")
-  def testBaseNeuronregister(self):
+  # @pytest.mark.skip(reason="Unable to specify several processes")
+  def testbaseregister(self):
     @bpl.register()
     class HH(bp.dyn.CondNeuGroup):
       def __init__(self, size):
@@ -89,7 +89,7 @@ class BaseFunctionsTestCase(BaseTest):
                                         self.pre2post, self.post.num, self.g_max)
         self.post.input += self.g * (self.E - self.post.V)
 
-    class EINet_v1(bpl.Network):
+    class EINet_v1(bpl.respa.Network):
       def __init__(self, scale=1.):
         super(EINet_v1, self).__init__()
         self.E = bpl.HH(int(3200 * scale))
@@ -110,7 +110,7 @@ class BaseFunctionsTestCase(BaseTest):
       net = EINet_v1(scale=1)
       net.build()
       runner = bpl.DSRunner(net, monitors={'E.spike': net.E.spike})
-      runner.run(5.)
+      runner.run(50.)
       # bp.visualize.raster_plot(runner.mon.ts, runner.mon['E.spike'], show=True)
 
     run_ei_v1()

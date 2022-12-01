@@ -3,7 +3,7 @@ import brainpy.dyn as dyn
 from brainpy.modes import Mode, normal
 from brainpy.types import Shape, Array
 from brainpy.connect import TwoEndConnector
-from typing import Union, Sequence, Callable, Tuple, Dict
+from typing import Union, Sequence, Callable, Dict
 import jax.tree_util
 from .res_manager import ResManager
 import bpl
@@ -167,8 +167,8 @@ class BaseSynapse:
 
   def __init__(
       self,
-      pre: Union[BaseNeuron, Tuple[BaseNeuron, Union[slice, Sequence, Array]]],
-      post: Union[BaseNeuron, Tuple[BaseNeuron, Union[slice, Sequence, Array]]],
+      pre: Union[BaseNeuron, BaseNeuronSlice],
+      post: Union[BaseNeuron, BaseNeuronSlice],
       conn: Union[TwoEndConnector, Array, Dict[str, Array]],
       *args,
       **kwargs
@@ -231,24 +231,26 @@ class BaseSynapse:
       self.lowref = self.model_class(pre, post, self.conn, *self.args, **self.kwargs)
     elif pre_pid == mpi_rank:
       if post not in BaseNeuron.proxy_neurons:
-        tmp_ = bpl.neurons.ProxyLIF(post_shape)
+        tmp_ = bpl.neurons.ProxyNeuronGroup(post_shape)
         BaseNeuron.proxy_neurons.update({post: tmp_})
       else:
         tmp_ = BaseNeuron.proxy_neurons[post]
       if post_slice is not None:
         for sli in post_slice:
           tmp_ = tmp_[sli]
-      self.lowref = self.model_class_remote(pre_pid, pre, post_pid, tmp_, conn=self.conn, *self.args, **self.kwargs)
+      self.lowref = bpl.synapses.RemoteSynapse(synapse_class=self.model_class, param_dict=dict(
+        pre=pre, post=tmp_, conn=self.conn, *self.args, **self.kwargs), source_rank=pre_pid, target_rank=post_pid)
     elif post_pid == mpi_rank:
       if pre not in BaseNeuron.proxy_neurons:
-        tmp_ = bpl.neurons.ProxyLIF(pre_shape)
+        tmp_ = bpl.neurons.ProxyNeuronGroup(pre_shape)
         BaseNeuron.proxy_neurons.update({pre: tmp_})
       else:
         tmp_ = BaseNeuron.proxy_neurons[pre]
       if pre_slice is not None:
         for sli in pre_slice:
           tmp_ = tmp_[sli]
-      self.lowref = self.model_class_remote(pre_pid, tmp_, post_pid, post, conn=self.conn, *self.args, **self.kwargs)
+      self.lowref = bpl.synapses.RemoteSynapse(synapse_class=self.model_class, param_dict=dict(
+        pre=tmp_, post=post, conn=self.conn, *self.args, **self.kwargs), source_rank=pre_pid, target_rank=post_pid)
     return self.lowref
 
 
@@ -270,22 +272,22 @@ class LIF(BaseNeuron):
 class Exponential(BaseSynapse):
   def __init__(
       self,
-      pre: Union[BaseNeuron, Tuple[BaseNeuron, Union[slice, Sequence, Array]]],
-      post: Union[BaseNeuron, Tuple[BaseNeuron, Union[slice, Sequence, Array]]],
+      pre: Union[BaseNeuron, BaseNeuronSlice],
+      post: Union[BaseNeuron, BaseNeuronSlice],
       conn: Union[TwoEndConnector, Array, Dict[str, Array]],
       *args,
       **kwargs
   ):
     super().__init__(pre, post, conn, *args, **kwargs)
     self.model_class = dyn.synapses.Exponential
-    self.model_class_remote = bpl.synapses.RemoteExponential
+    # self.model_class_remote = bpl.synapses.RemoteExponential
 
 
 class Network:
   def __init__(self, *ds_tuple, name: str = None, mode: Mode = normal, **ds_dict):
     self.ds_tuple = ds_tuple
     self.ds_dict = ds_dict
-    self.lowref = bpl.RemoteNetwork((), name=name, mode=mode)
+    self.lowref = bpl.core.Network((), name=name, mode=mode)
 
   def __getattr__(self, __name: str):
     return self.lowref.__getattribute__(__name)
