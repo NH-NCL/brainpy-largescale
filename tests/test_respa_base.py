@@ -4,7 +4,7 @@ import brainpy as bp
 from brainpy.dyn import channels, synouts
 import brainpy.math as bm
 from .base import BaseTest
-import pytest
+# import pytest
 
 
 class BaseFunctionsTestCase(BaseTest):
@@ -47,10 +47,10 @@ class BaseFunctionsTestCase(BaseTest):
     if 'spike' in runner.mon:
       # bp.visualize.raster_plot(
       #   runner.mon.ts, runner.mon['spike'], show=True)
-    #   print(net.pops_)
+      #   print(net.pops_)
       print(net.pops_by_rank)
-    #   print(net.syns_)
-    #   print(net.nodes())
+      #   print(net.syns_)
+      #   print(net.nodes())
 
   # @pytest.mark.skip(reason="Unable to specify several processes")
   def testbaseregister(self):
