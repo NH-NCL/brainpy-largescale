@@ -36,12 +36,7 @@ def reset():
 class BaseNeuron:
   proxy_neurons = {}
 
-  def __init__(
-      self,
-      shape: Shape,
-      *args,
-      **kwargs
-  ):
+  def __init__(self, shape: Shape, *args, **kwargs):
     self.args = args
     self.kwargs = kwargs
     self.shape = shape
@@ -77,6 +72,7 @@ class BaseNeuron:
 
 
 class BaseNeuronSlice:
+
   def __init__(self, target: Union[BaseNeuron, 'BaseNeuronSlice'], index: Union[slice, Sequence, Array]):
     if isinstance(target, BaseNeuron):
       self.target = target
@@ -149,8 +145,7 @@ class register():
       else:
         name = self.name
       bases = (BaseSynapse,)
-      attrs = {'__qualname__': name,
-               'model_class': cls, 'model_class_remote': None}
+      attrs = {'__qualname__': name, 'model_class': cls, 'model_class_remote': None}
     else:
       raise RuntimeError(f'custom {self.model} is not supported')
     respa_type = type(name, bases, attrs)
@@ -165,14 +160,8 @@ class register():
 
 class BaseSynapse:
 
-  def __init__(
-      self,
-      pre: Union[BaseNeuron, BaseNeuronSlice],
-      post: Union[BaseNeuron, BaseNeuronSlice],
-      conn: Union[TwoEndConnector, Array, Dict[str, Array]],
-      *args,
-      **kwargs
-  ):
+  def __init__(self, pre: Union[BaseNeuron, BaseNeuronSlice], post: Union[BaseNeuron, BaseNeuronSlice],
+               conn: Union[TwoEndConnector, Array, Dict[str, Array]], *args, **kwargs):
     self.pre = pre
     self.post = post
     self.conn = conn
@@ -238,8 +227,11 @@ class BaseSynapse:
       if post_slice is not None:
         for sli in post_slice:
           tmp_ = tmp_[sli]
-      self.lowref = bpl.synapses.RemoteSynapse(synapse_class=self.model_class, param_dict=dict(
-        pre=pre, post=tmp_, conn=self.conn, *self.args, **self.kwargs), source_rank=pre_pid, target_rank=post_pid)
+      self.lowref = bpl.synapses.RemoteSynapse(
+        synapse_class=self.model_class,
+        param_dict=dict(pre=pre, post=tmp_, conn=self.conn, *self.args, **self.kwargs),
+        source_rank=pre_pid,
+        target_rank=post_pid)
     elif post_pid == mpi_rank:
       if pre not in BaseNeuron.proxy_neurons:
         tmp_ = bpl.neurons.ProxyNeuronGroup(pre_shape)
@@ -249,18 +241,17 @@ class BaseSynapse:
       if pre_slice is not None:
         for sli in pre_slice:
           tmp_ = tmp_[sli]
-      self.lowref = bpl.synapses.RemoteSynapse(synapse_class=self.model_class, param_dict=dict(
-        pre=tmp_, post=post, conn=self.conn, *self.args, **self.kwargs), source_rank=pre_pid, target_rank=post_pid)
+      self.lowref = bpl.synapses.RemoteSynapse(
+        synapse_class=self.model_class,
+        param_dict=dict(pre=tmp_, post=post, conn=self.conn, *self.args, **self.kwargs),
+        source_rank=pre_pid,
+        target_rank=post_pid)
     return self.lowref
 
 
 class LIF(BaseNeuron):
-  def __init__(
-      self,
-      shape: Shape,
-      *args,
-      **kwargs
-  ):
+
+  def __init__(self, shape: Shape, *args, **kwargs):
     super(LIF, self).__init__(shape, *args, **kwargs)
     self.model_class = dyn.LIF
 
@@ -270,20 +261,16 @@ class LIF(BaseNeuron):
 
 
 class Exponential(BaseSynapse):
-  def __init__(
-      self,
-      pre: Union[BaseNeuron, BaseNeuronSlice],
-      post: Union[BaseNeuron, BaseNeuronSlice],
-      conn: Union[TwoEndConnector, Array, Dict[str, Array]],
-      *args,
-      **kwargs
-  ):
+
+  def __init__(self, pre: Union[BaseNeuron, BaseNeuronSlice], post: Union[BaseNeuron, BaseNeuronSlice],
+               conn: Union[TwoEndConnector, Array, Dict[str, Array]], *args, **kwargs):
     super().__init__(pre, post, conn, *args, **kwargs)
     self.model_class = dyn.synapses.Exponential
     # self.model_class_remote = bpl.synapses.RemoteExponential
 
 
 class Network:
+
   def __init__(self, *ds_tuple, name: str = None, mode: Mode = normal, **ds_dict):
     self.ds_tuple = ds_tuple
     self.ds_dict = ds_dict
@@ -358,8 +345,7 @@ class DSRunner:
       t0: Union[float, int] = 0.,
       spike_callback: Callable = None,
       volt_callback: Callable = None,
-      **kwargs
-  ):
+      **kwargs):
     if not isinstance(target, (Network, dyn.DynamicalSystem)):
       raise ValueError(type(target))
 
