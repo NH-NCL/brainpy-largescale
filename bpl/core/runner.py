@@ -47,7 +47,7 @@ class BplRunner(dyn.DSRunner):
         # monitor step
         mon = monitor_func(shared)
         if self.callback:
-          self.callback(t, mon)
+          self.callback(float(t), mon)
         # finally
         if self.progress_bar:
           id_tap(lambda *arg: self._pbar.update(), ())

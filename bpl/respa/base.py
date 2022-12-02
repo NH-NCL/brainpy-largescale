@@ -357,13 +357,13 @@ class DSRunner:
         if k == 'spike' and spike_callback:
           a = []
           for i, j in enumerate(v):
-            if j is True:
+            if bool(j):
               a.append((i + 1, t))
           spike_callback(a)
         if k == 'V' and volt_callback:
           a = []
           for i, j in enumerate(v):
-            a.append((i + 1, t, j))
+            a.append((i + 1, t, float(j)))
           volt_callback(a)
 
     c = _callback if spike_callback or volt_callback else None
