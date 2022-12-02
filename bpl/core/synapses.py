@@ -96,9 +96,9 @@ class RemoteSynapse(DynamicalSystem, dyn.base.TwoEndConn):
         self.synapse_instance = self.synapse_class(**param_dict)
 
     elif self.rank == target_rank:
-      param_dict['pre'].name = param_dict['pre'].name + self.rank_pair
-      if param_dict['pre'].name not in self.remote_synapse_mark:
-        self.remote_synapse_mark.append(param_dict['pre'].name)
+      check_name = param_dict['pre'].name + self.rank_pair
+      if check_name not in self.remote_synapse_mark:
+        self.remote_synapse_mark.append(check_name)
         # Replace some function to save place or make synapse work in muti-device enviornment
         self.synapse_class.get_delay_data = self.remote_get_delay_data
         # receive
