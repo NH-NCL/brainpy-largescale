@@ -1,12 +1,15 @@
 import unittest
 import sys
+
 sys.path.append('../')
+
 import bpl
 import brainpy as bp
 import brainpy.math as bm
 
 
 class EINet_V1(bpl.Network):
+
   def __init__(self, scale=1.0, method='exp_auto', delay_step=None):
     super(EINet_V1, self).__init__()
 
@@ -26,49 +29,64 @@ class EINet_V1(bpl.Network):
     self.I3 = bp.neurons.LIF(num_inh, **pars, method=method)
     self.I4 = bp.neurons.LIF(num_inh, **pars, method=method)
     self.I5 = bp.neurons.LIF(num_inh, **pars, method=method)
-    self.E12I1 = bp.synapses.Exponential(self.E1, self.I1,
-                                         bp.conn.FixedProb(0.02, seed=1),
-                                         output=bp.synouts.COBA(E=0.), g_max=we,
-                                         tau=5.,
-                                         method=method, delay_step=delay_step)
-    self.E12I2 = bp.synapses.Exponential(self.E1, self.I2,
-                                         bp.conn.FixedProb(0.02, seed=1),
-                                         output=bp.synouts.COBA(E=0.), g_max=we,
-                                         tau=5.,
-                                         method=method,
-                                         delay_step=delay_step
-                                         )
-    self.E12I3 = bp.synapses.Exponential(self.E1, self.I3,
-                                         bp.conn.FixedProb(0.02, seed=1),
-                                         output=bp.synouts.COBA(E=0.), g_max=we,
-                                         tau=5.,
-                                         method=method,
-                                         delay_step=delay_step
-                                         )
-    self.E12I4 = bp.synapses.Exponential(self.E1, self.I4,
-                                         bp.conn.FixedProb(0.02, seed=1),
-                                         output=bp.synouts.COBA(E=0.), g_max=we,
-                                         tau=5.,
-                                         method=method,
-                                         delay_step=delay_step
-                                         )
-    self.E12I5 = bp.synapses.Exponential(self.E1, self.I5,
-                                         bp.conn.FixedProb(0.02, seed=1),
-                                         output=bp.synouts.COBA(E=0.), g_max=we,
-                                         tau=5.,
-                                         method=method,
-                                         delay_step=delay_step
-                                         )
-    self.I42I5 = bp.synapses.Exponential(self.I4, self.I5,
-                                         bp.conn.FixedProb(0.02, seed=1),
-                                         output=bp.synouts.COBA(E=0.), g_max=wi,
-                                         tau=5.,
-                                         method=method,
-                                         delay_step=delay_step
-                                         )
+    self.E12I1 = bp.synapses.Exponential(
+      self.E1,
+      self.I1,
+      bp.conn.FixedProb(0.02, seed=1),
+      output=bp.synouts.COBA(E=0.),
+      g_max=we,
+      tau=5.,
+      method=method,
+      delay_step=delay_step)
+    self.E12I2 = bp.synapses.Exponential(
+      self.E1,
+      self.I2,
+      bp.conn.FixedProb(0.02, seed=1),
+      output=bp.synouts.COBA(E=0.),
+      g_max=we,
+      tau=5.,
+      method=method,
+      delay_step=delay_step)
+    self.E12I3 = bp.synapses.Exponential(
+      self.E1,
+      self.I3,
+      bp.conn.FixedProb(0.02, seed=1),
+      output=bp.synouts.COBA(E=0.),
+      g_max=we,
+      tau=5.,
+      method=method,
+      delay_step=delay_step)
+    self.E12I4 = bp.synapses.Exponential(
+      self.E1,
+      self.I4,
+      bp.conn.FixedProb(0.02, seed=1),
+      output=bp.synouts.COBA(E=0.),
+      g_max=we,
+      tau=5.,
+      method=method,
+      delay_step=delay_step)
+    self.E12I5 = bp.synapses.Exponential(
+      self.E1,
+      self.I5,
+      bp.conn.FixedProb(0.02, seed=1),
+      output=bp.synouts.COBA(E=0.),
+      g_max=we,
+      tau=5.,
+      method=method,
+      delay_step=delay_step)
+    self.I42I5 = bp.synapses.Exponential(
+      self.I4,
+      self.I5,
+      bp.conn.FixedProb(0.02, seed=1),
+      output=bp.synouts.COBA(E=0.),
+      g_max=wi,
+      tau=5.,
+      method=method,
+      delay_step=delay_step)
 
 
 class MPITestCase(unittest.TestCase):
+
   def run_model(self, delay_step):
     # no delay
     net = EINet_V1(scale=1., method='exp_auto', delay_step=delay_step)
