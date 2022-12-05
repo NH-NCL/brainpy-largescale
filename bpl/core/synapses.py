@@ -70,37 +70,36 @@ class RemoteSynapse(DynamicalSystem, dyn.base.TwoEndConn):
     self.synapse_class.register_delay = self.remote_register_delay
 
     if self.rank == source_rank:
+      # Replace some function to save place or make synapse work in muti-device enviornment
+      def source_rank_init_weights(*para, **dict):
+        return None, None
+      self.synapse_class.init_weights = source_rank_init_weights
+
+      def variable_(*param, **dict):
+        return None
+
+      def odeint(*param, **dict):
+        return None
       # Make sure the same neuron group only deliver its spike one time
       # during one step network simulation between this two ranks
       check_name = param_dict['pre'].name + self.rank_pair
       if check_name not in self.remote_synapse_mark:
         self.remote_synapse_mark.append(check_name)
-        # Replace some function to save place or make synapse work in muti-device enviornment
-
-        def source_rank_init_weights(*para, **dict):
-          return None, None
-        self.synapse_class.init_weights = source_rank_init_weights
-
-        def variable_(*param, **dict):
-          return None
-
-        def odeint(*param, **dict):
-          return None
         # send
         if platform.system() == 'Windows':
           self.comm.send(len(param_dict['pre'].spike), dest=target_rank, tag=0)
           self.comm.Send(param_dict['pre'].spike.to_numpy(), dest=target_rank, tag=1)
         else:
           token = mpi4jax.send(param_dict['pre'].spike.value, dest=target_rank, tag=0, comm=self.comm)
-        # initialize
-        self.synapse_instance = self.synapse_class(**param_dict)
+      # initialize
+      self.synapse_instance = self.synapse_class(**param_dict)
 
     elif self.rank == target_rank:
-      param_dict['pre'].name = param_dict['pre'].name + self.rank_pair
-      if param_dict['pre'].name not in self.remote_synapse_mark:
-        self.remote_synapse_mark.append(param_dict['pre'].name)
-        # Replace some function to save place or make synapse work in muti-device enviornment
-        self.synapse_class.get_delay_data = self.remote_get_delay_data
+      # Replace some function to save place or make synapse work in muti-device enviornment
+      self.synapse_class.get_delay_data = self.remote_get_delay_data
+      check_name = param_dict['pre'].name + self.rank_pair
+      if check_name not in self.remote_synapse_mark:
+        self.remote_synapse_mark.append(check_name)
         # receive
         if platform.system() == 'Windows':
           pre_len = self.comm.recv(source=source_rank, tag=0)
@@ -110,8 +109,8 @@ class RemoteSynapse(DynamicalSystem, dyn.base.TwoEndConn):
           pre_spike, token = mpi4jax.recv(param_dict['pre'].spike.value, source=source_rank, tag=0, comm=self.comm)
         # self.pre.spike should catch the spike data sent from source rank.
         param_dict['pre'].spike = bm.Variable(pre_spike)
-        # initialize
-        self.synapse_instance = self.synapse_class(**param_dict)
+      # initialize
+      self.synapse_instance = self.synapse_class(**param_dict)
 
   def remote_register_delay(
       self,
@@ -196,7 +195,7 @@ class RemoteSynapse(DynamicalSystem, dyn.base.TwoEndConn):
           indices = (jnp.arange(delay_step.size),)
         return self.remote_global_delay_data[identifier][0](0, *indices)
 
-    if identifier in self.global_delay_data:
+    if identifier in self.remote_global_delay_data:
       if bm.ndim(delay_step) == 0:
         return self.remote_global_delay_data[identifier][0](delay_step, *indices)
       else:
