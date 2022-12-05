@@ -66,11 +66,9 @@ class Optimizer():
     sum_hardware_store[0] = sum_hardware_store[0] + self.device_memory
     sum_hardware_store[1] = sum_hardware_store[1] + self.device_capability
 
-    edge_weight_matrix = self.get_edge_weight_matrix(
-      ResManager.syns, total_num=total_num)
+    edge_weight_matrix = self.get_edge_weight_matrix(ResManager.syns, total_num=total_num)
 
-    memory_used = int((edge_weight_matrix.sum(0) * 10 +
-                       pop_neuron_count * 300) / (1024 ** 3))
+    memory_used = int((edge_weight_matrix.sum(0) * 10 + pop_neuron_count * 300) / (1024**3))
     memory_capacity = int(sum_hardware_store[0])
 
     return (edge_weight_matrix, memory_used, memory_capacity)
@@ -119,8 +117,8 @@ class Optimizer():
       remote_conn_pre = remote_conn
       remote_conn = remote_conn + A[population_index, :].sum() - A[population_index, result.get(device_index)].sum()
 
-      new_capacity = device_available[device_index] - memory_used[population_index] - (
-        remote_conn - remote_conn_pre) * 280 / 1024 ** 3
+      new_capacity = device_available[device_index] - memory_used[population_index] - (remote_conn -
+                                                                                       remote_conn_pre) * 280 / 1024**3
 
       if new_capacity >= 0:
         device_available[device_index] = new_capacity

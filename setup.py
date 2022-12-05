@@ -35,7 +35,9 @@ setup(
   author_email='nhnao@cnaeit.com',
   packages=packages,
   python_requires='>=3.7',
-  install_requires=['numpy>=1.15', 'tqdm', 'brainpy==2.2.4.0', 'numba', 'mpi4py==3.1.4', 'mpi4jax==0.3.11', 'jax==0.3.25', 'matplotlib'],
+  install_requires=[
+    'numpy>=1.15', 'tqdm', 'brainpy==2.2.4.0', 'numba', 'mpi4py==3.1.4', 'mpi4jax==0.3.11', 'jax==0.3.25', 'matplotlib'
+  ],
   url='https://github.com/NH-NCL/brainpy-largescale',
   project_urls={
     "Bug Tracker": "https://github.com/NH-NCL/brainpy-largescale/issues",

@@ -9,6 +9,7 @@ from brainpy.tools.others.dicts import DotDict
 
 
 class BplRunner(dyn.DSRunner):
+
   def __init__(
       self,
       target: dyn.DynamicalSystem,
@@ -21,8 +22,7 @@ class BplRunner(dyn.DSRunner):
       dt: float = None,
       t0: Union[float, int] = 0.,
       callback: Callable = None,
-      **kwargs
-  ):
+      **kwargs):
     super(BplRunner, self).__init__(target=target, inputs=inputs, fun_inputs=fun_inputs, dt=dt, t0=t0, **kwargs)
     self.callback = callback
 
@@ -61,6 +61,7 @@ class BplRunner(dyn.DSRunner):
           return bm.for_loop(_step_func, dyn_vars.unique(), all_inputs)
 
       else:
+
         def run_func(xs):
           # total data
           times, indices, xs = xs
@@ -87,5 +88,6 @@ class BplRunner(dyn.DSRunner):
           for key, value in monitors.items():
             monitors[key] = bm.asarray(value)
           return outputs, monitors
+
       self._f_predict_compiled[shared_kwargs_str] = run_func
     return self._f_predict_compiled[shared_kwargs_str]
