@@ -24,18 +24,14 @@ a = bpl.LIF(
   V_th=-50.,
   V_reset=-60.,
   tau=20.,
-  tau_ref=5.,
-  method='exp_auto',
-  V_initializer=bp.initialize.Normal(-55., 2.))
+  tau_ref=5.)
 b = bpl.LIF(
   100,
   V_rest=-60.,
   V_th=-50.,
   V_reset=-60.,
   tau=20.,
-  tau_ref=5.,
-  method='exp_auto',
-  V_initializer=bp.initialize.Normal(-55., 2.))
+  tau_ref=5.)
 ```
 
 ## 创建突触
@@ -46,10 +42,8 @@ d = bpl.Exponential(
   a,
   b,
   bp.conn.FixedProb(0.04, seed=123),
-  g_max=10,
-  tau=5.,
-  output=bp.synouts.COBA(E=0.),
-  method='exp_auto',
+  g_max=1.0,
+  tau=8.0，
   delay_step=1)
 ```
 在这里，我们使用指数突触模型 (bpl.Exponential) 来模拟突触连接。在模型的参数中，前两个分别表示突触前和突触后神经元组。第三个是指连接类型。在此示例中，我们使用 bp.conn.FixedProb，它以给定的概率将突触前神经元连接到突触后神经元（详细信息可在 Synaptic Connection 中获得）。以下三个参数描述了突触的动态特性，最后一个是 LIF 模型中的数值积分方法。
