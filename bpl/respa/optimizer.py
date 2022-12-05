@@ -3,7 +3,7 @@ from brainpy.connect.random_conn import FixedProb
 from typing import List, Tuple
 
 from .res_manager import ResManager
-from .base import mpi_size
+from bpl.base import mpi_size
 
 
 class Optimizer():
