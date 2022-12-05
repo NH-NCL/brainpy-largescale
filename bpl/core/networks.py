@@ -15,18 +15,8 @@ class Network(dyn.Network, DynamicalSystem):
   """Exponential decay synapse model in multi-device environment.
   """
 
-  def __init__(
-      self,
-      *ds_tuple,
-      comm=MPI.COMM_WORLD,
-      name: str = None,
-      mode: Mode = normal,
-      **ds_dict
-  ):
-    super(Network, self).__init__(*ds_tuple,
-                                  name=name,
-                                  mode=mode,
-                                  **ds_dict)
+  def __init__(self, *ds_tuple, comm=MPI.COMM_WORLD, name: str = None, mode: Mode = normal, **ds_dict):
+    super(Network, self).__init__(*ds_tuple, name=name, mode=mode, **ds_dict)
     self.comm = comm
     if self.comm is None:
       self.rank = None
@@ -61,8 +51,8 @@ class Network(dyn.Network, DynamicalSystem):
               target = np.empty(pre_len, dtype=np.bool_)
               self.comm.Recv(target, source=node.source_rank, tag=3)
             else:
-              target, token = mpi4jax.recv(node.synapse_instance.pre.spike.value,
-                                           source=node.source_rank, tag=3, comm=self.comm)
+              target, token = mpi4jax.recv(
+                node.synapse_instance.pre.spike.value, source=node.source_rank, tag=3, comm=self.comm)
             target = bm.Variable(target)
             delay.update(target.value)
       else:
@@ -95,8 +85,8 @@ class Network(dyn.Network, DynamicalSystem):
               target = np.empty(pre_len, dtype=np.bool_)
               self.comm.Recv(target, source=node.source_rank, tag=5)
             else:
-              target, token = mpi4jax.recv(node.synapse_instance.pre.spike.value,
-                                           source=node.source_rank, tag=4, comm=self.comm)
+              target, token = mpi4jax.recv(
+                node.synapse_instance.pre.spike.value, source=node.source_rank, tag=4, comm=self.comm)
             target = bm.Variable(target)
             delay.reset(target.value)
       else:

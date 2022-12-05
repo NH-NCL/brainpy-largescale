@@ -1,6 +1,5 @@
 from typing import Union, Callable, Optional
 
-
 import brainpy.math as bm
 from brainpy import dyn
 from brainpy.initialize import Initializer, parameter
@@ -34,14 +33,7 @@ class RemoteSynapse(DynamicalSystem, dyn.base.TwoEndConn):
       Communicators object in mpi4py package.
   """
 
-  def __init__(
-      self,
-      synapse_class,
-      param_dict,
-      source_rank,
-      target_rank,
-      comm=MPI.COMM_WORLD
-  ):
+  def __init__(self, synapse_class, param_dict, source_rank, target_rank, comm=MPI.COMM_WORLD):
     # Make sure RemoteSynapse can work correctly.
     if not issubclass(synapse_class, TwoEndConn):
       raise Exception('synapse_class should be a subclass (not a instance of class) of brainpy.dyn.base.TwoEndConn.')
@@ -51,14 +43,18 @@ class RemoteSynapse(DynamicalSystem, dyn.base.TwoEndConn):
         raise Exception('First 3 keys in param_dict must be pre post and conn in order.')
       count -= 1
     if count > 0:
-      raise Exception('At least 3 items should be given to param_dict and first 3 keys in param_dict must be pre post and conn in order.')
+      raise Exception(
+        'At least 3 items should be given to param_dict and first 3 keys in param_dict must be pre post and conn in order.'
+      )
 
     super(RemoteSynapse, self).__init__(param_dict['pre'], param_dict['post'], param_dict['conn'])
+
     # Create a new class because some class method will change in the following code.
     # Below code can prevent origin class from being affected.
 
     class sub_synapse_class(DynamicalSystem, synapse_class):
       pass
+
     self.synapse_class = sub_synapse_class
 
     self.comm = comm
@@ -73,6 +69,7 @@ class RemoteSynapse(DynamicalSystem, dyn.base.TwoEndConn):
       # Replace some function to save place or make synapse work in muti-device enviornment
       def source_rank_init_weights(*para, **dict):
         return None, None
+
       self.synapse_class.init_weights = source_rank_init_weights
 
       def variable_(*param, **dict):
@@ -80,6 +77,7 @@ class RemoteSynapse(DynamicalSystem, dyn.base.TwoEndConn):
 
       def odeint(*param, **dict):
         return None
+
       # Make sure the same neuron group only deliver its spike one time
       # during one step network simulation between this two ranks
       check_name = param_dict['pre'].name + self.rank_pair
@@ -113,11 +111,11 @@ class RemoteSynapse(DynamicalSystem, dyn.base.TwoEndConn):
       self.synapse_instance = self.synapse_class(**param_dict)
 
   def remote_register_delay(
-      self,
-      identifier: str,
-      delay_step: Optional[Union[int, Array, Callable, Initializer]],
-      delay_target: bm.Variable,
-      initial_delay_data: Union[Initializer, Callable, Array, float, int, bool] = None,
+    self,
+    identifier: str,
+    delay_step: Optional[Union[int, Array, Callable, Initializer]],
+    delay_target: bm.Variable,
+    initial_delay_data: Union[Initializer, Callable, Array, float, int, bool] = None,
   ):
     """Register delay variable in multi-device enviornmrnt.
     """
@@ -179,10 +177,10 @@ class RemoteSynapse(DynamicalSystem, dyn.base.TwoEndConn):
     return delay_step
 
   def remote_get_delay_data(
-      self,
-      identifier: str,
-      delay_step: Optional[Union[int, bm.JaxArray, jnp.DeviceArray]],
-      *indices: Union[int, slice, bm.JaxArray, jnp.DeviceArray],
+    self,
+    identifier: str,
+    delay_step: Optional[Union[int, bm.JaxArray, jnp.DeviceArray]],
+    *indices: Union[int, slice, bm.JaxArray, jnp.DeviceArray],
   ):
     """Get delay data according to the provided delay steps in multi-device enviornment.
     """
