@@ -6,43 +6,19 @@ import bpl
 import brainpy as bp
 from typing import List, Tuple
 
-a = bpl.LIF(
-  200,
-  V_rest=-60.,
-  V_th=-50.,
-  V_reset=-60.,
-  tau=20.,
-  tau_ref=5.,
-  method='exp_auto',
-  V_initializer=bp.initialize.Normal(-55., 2.))
-b = bpl.LIF(
-  100,
-  V_rest=-60.,
-  V_th=-50.,
-  V_reset=-60.,
-  tau=20.,
-  tau_ref=5.,
-  method='exp_auto',
-  V_initializer=bp.initialize.Normal(-55., 2.))
-d = bpl.Exponential(
-  a,
-  b,
-  bp.conn.FixedProb(0.04, seed=123),
-  g_max=10,
-  tau=5.,
-  output=bp.synouts.COBA(E=0.),
-  method='exp_auto',
-  delay_step=1)
+bpl.set_platform('cpu')
 
-net = bpl.respa.Network(a, b, d)
+a = bpl.neurons.LIF(300, V_rest=-60., V_th=-50., V_reset=-60., tau=20., tau_ref=5.)
+b = bpl.neurons.LIF(100, V_rest=-60., V_th=-50., V_reset=-60., tau=20., tau_ref=5.)
+d = bpl.synapses.Exponential(a, b, bp.conn.FixedProb(0.4, seed=123), g_max=10, tau=5., delay_step=1)
+
+net = bpl.Network(a, b, d)
 net.build()
 
-inputs = bpl.input_transform([(a, 20)])
-monitor_spike = bpl.monitor_transform([a], attr='spike')
-monitor_volt = bpl.monitor_transform([a], attr='V')
-monitors = {}
-monitors.update(monitor_spike)
-monitors.update(monitor_volt)
+inputs = [bpl.device.Input(a, 20), bpl.device.Input(b, 10)]
+monitor_spike = bpl.device.Monitor([a, b], bpl.device.MonitorKey.spike)
+monitor_volt = bpl.device.Monitor([b], bpl.device.MonitorKey.volt)
+monitors = [monitor_spike, monitor_volt]
 
 
 def spike(a: List[Tuple[int, float]]):
@@ -55,7 +31,7 @@ def volt(a: List[Tuple[int, float, float]]):
   pass
 
 
-runner = bpl.DSRunner(
+runner = bpl.runner.DSRunner(
   net,
   monitors=monitors,
   inputs=inputs,

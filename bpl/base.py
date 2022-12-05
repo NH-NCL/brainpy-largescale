@@ -3,9 +3,9 @@ import brainpy.dyn as dyn
 from brainpy.modes import Mode, normal
 from brainpy.types import Shape, Array
 from brainpy.connect import TwoEndConnector
-from typing import Union, Sequence, Callable, Dict
+from typing import Union, Sequence, Dict
 import jax.tree_util
-from .res_manager import ResManager
+from bpl.respa.res_manager import ResManager
 import bpl
 import copy
 
@@ -33,11 +33,21 @@ def reset():
   pop_id = 0
 
 
+def set_platform(platform: str):
+  """
+  Changes platform to CPU, GPU, or TPU. This utility only takes
+  effect at the beginning of your program.
+  """
+  from jax import config
+  assert platform in ['cpu', 'gpu']
+  config.update("jax_platform_name", platform)
+
+
 class BaseNeuron:
   proxy_neurons = {}
 
-  def __init__(self, shape: Shape, *args, **kwargs):
-    self.args = args
+  def __init__(self, shape: Shape, **kwargs):
+    self.args = []
     self.kwargs = kwargs
     self.shape = shape
     # self.model_class = None
@@ -161,11 +171,11 @@ class register():
 class BaseSynapse:
 
   def __init__(self, pre: Union[BaseNeuron, BaseNeuronSlice], post: Union[BaseNeuron, BaseNeuronSlice],
-               conn: Union[TwoEndConnector, Array, Dict[str, Array]], *args, **kwargs):
+               conn: Union[TwoEndConnector, Array, Dict[str, Array]], **kwargs):
     self.pre = pre
     self.post = post
     self.conn = conn
-    self.args = args
+    self.args = []
     self.kwargs = kwargs
     # self.model_class = None
     self.lowref = None
@@ -249,24 +259,8 @@ class BaseSynapse:
     return self.lowref
 
 
-class LIF(BaseNeuron):
-
-  def __init__(self, shape: Shape, *args, **kwargs):
-    super(LIF, self).__init__(shape, *args, **kwargs)
-    self.model_class = dyn.LIF
-
-
 # another way to define respa LIF
 # BaseNeuron.register(dyn.LIF)
-
-
-class Exponential(BaseSynapse):
-
-  def __init__(self, pre: Union[BaseNeuron, BaseNeuronSlice], post: Union[BaseNeuron, BaseNeuronSlice],
-               conn: Union[TwoEndConnector, Array, Dict[str, Array]], *args, **kwargs):
-    super().__init__(pre, post, conn, *args, **kwargs)
-    self.model_class = dyn.synapses.Exponential
-    # self.model_class_remote = bpl.synapses.RemoteExponential
 
 
 class Network:
@@ -332,43 +326,49 @@ class Network:
     self.lowref.register_implicit_vars(*variables, **named_variables)
 
 
-class DSRunner:
+def input_transform(pops: Sequence):
+  """Select BaseNeurons which locate on current process and return its input.
 
-  def __init__(
-      self,
-      target: Union[dyn.DynamicalSystem, Network],
-      # inputs for target variables
-      inputs: Sequence = (),
-      fun_inputs: Callable = None,
-      # extra info
-      dt: float = None,
-      t0: Union[float, int] = 0.,
-      spike_callback: Callable = None,
-      volt_callback: Callable = None,
-      **kwargs):
-    if not isinstance(target, (Network, dyn.DynamicalSystem)):
-      raise ValueError(type(target))
+  Parameters
+  ----------
+  pops : Sequence
 
-    if isinstance(target, Network):
-      target = target.lowref
+  Returns
+  -------
+  The inputs for the target DynamicalSystem. It should be the format
+    of `[(target, value, [type, operation])]
+  """
+  if len(pops) > 0 and not isinstance(pops[0], (list, tuple)):
+    pops = [pops]
+  input_trans = []
+  for pop in pops:
+    try:
+      tmp = pop[0].input
+      input_trans.append((tmp, pop[1]) + pop[2:])
+    except Exception:
+      continue
+  return input_trans
 
-    def _callback(t: float, d: dict):
-      for k, v in d.items():
-        if k == 'spike' and spike_callback:
-          a = []
-          for i, j in enumerate(v):
-            if bool(j):
-              a.append((i + 1, t))
-          spike_callback(a)
-        if k == 'V' and volt_callback:
-          a = []
-          for i, j in enumerate(v):
-            a.append((i + 1, t, float(j)))
-          volt_callback(a)
 
-    c = _callback if spike_callback or volt_callback else None
+def monitor_transform(pops: Sequence[BaseNeuron], attr: str = 'spike'):
+  """generate monitor parameters dictionary
 
-    self.lowref = bpl.BplRunner(target=target, inputs=inputs, fun_inputs=fun_inputs, dt=dt, t0=t0, callback=c, **kwargs)
+  Parameters
+  ----------
+  pops : Sequence[BaseNeuron]
 
-  def __getattr__(self, __name: str):
-    return self.lowref.__getattribute__(__name)
+  attr : str, optional
+      attribute to monitor, by default 'spike'
+
+  Returns
+  -------
+  {attribute : BaseNeuron.attribute}
+  """
+  mon_var = {}
+  for pop in pops:
+    try:
+      tmp = getattr(pop, attr)
+      mon_var.update({attr: tmp})
+    except Exception:
+      continue
+  return mon_var

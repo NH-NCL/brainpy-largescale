@@ -1,12 +1,12 @@
-brainpy
+brainpy==2.2.4.0
 numpy>=1.15
 jax>=0.3.0
 tqdm
 numba
-mpi4py
-brainpylib
-mpi4jax
-jax[cpu]==0.3.24
+mpi4py==3.1.4
+mpi4jax==0.3.11
+jax==0.3.25
+matplotlib
 
 # test requirement
 pytest
