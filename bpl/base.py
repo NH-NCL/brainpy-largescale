@@ -230,28 +230,28 @@ class BaseSynapse:
       self.lowref = self.model_class(pre, post, self.conn, *self.args, **self.kwargs)
     elif pre_pid == mpi_rank:
       if post not in BaseNeuron.proxy_neurons:
-        tmp_ = bpl.neurons.ProxyNeuronGroup(post_shape)
+        tmp_ = bpl.core.neurons.ProxyNeuronGroup(post_shape)
         BaseNeuron.proxy_neurons.update({post: tmp_})
       else:
         tmp_ = BaseNeuron.proxy_neurons[post]
       if post_slice is not None:
         for sli in post_slice:
           tmp_ = tmp_[sli]
-      self.lowref = bpl.synapses.RemoteSynapse(
+      self.lowref = bpl.core.synapses.RemoteSynapse(
         synapse_class=self.model_class,
         param_dict=dict(pre=pre, post=tmp_, conn=self.conn, *self.args, **self.kwargs),
         source_rank=pre_pid,
         target_rank=post_pid)
     elif post_pid == mpi_rank:
       if pre not in BaseNeuron.proxy_neurons:
-        tmp_ = bpl.neurons.ProxyNeuronGroup(pre_shape)
+        tmp_ = bpl.core.neurons.ProxyNeuronGroup(pre_shape)
         BaseNeuron.proxy_neurons.update({pre: tmp_})
       else:
         tmp_ = BaseNeuron.proxy_neurons[pre]
       if pre_slice is not None:
         for sli in pre_slice:
           tmp_ = tmp_[sli]
-      self.lowref = bpl.synapses.RemoteSynapse(
+      self.lowref = bpl.core.synapses.RemoteSynapse(
         synapse_class=self.model_class,
         param_dict=dict(pre=tmp_, post=post, conn=self.conn, *self.args, **self.kwargs),
         source_rank=pre_pid,
