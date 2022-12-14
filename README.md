@@ -1,71 +1,67 @@
 # brainpy-largescale
 
-## 安装
-只支持`Linux`系统下安装
+## Install
+Only support `Linux`
 ```
 pip install brainpy-largescale
 ```
 
 
-## 引入库
+## import
 ```python
 import brainpy as bp
 import bpl
 ```
 
-## 设置硬件平台
+## set platform
 ```
 bpl.set_platform('cpu')
 ```
-目前只支持cpu，因brainpy 目前有个问题，不支持gpu。
+only support cpu.
 
-## 创建神经元簇
+## create population
 
-用简单但最典型的神经元模型 Leaky Integrate-and-Fire (LIF) 模型来构建兴奋性和抑制性神经元组
+Use Leaky Integrate-and-Fire (LIF)
 
 ```python
 a = bpl.neurons.LIF(300, V_rest=-60., V_th=-50., V_reset=-60., tau=20., tau_ref=5.)
 b = bpl.neurons.LIF(100, V_rest=-60., V_th=-50., V_reset=-60., tau=20., tau_ref=5.)
 ```
 
-## 创建突触
-在定义 LIF 神经元组时，可以根据用户的需要调整参数。第一个参数表示神经元的数量。这里兴奋性和抑制性神经元的比例设置为 4:1。 V_rest 表示静息电位，V_th 表示触发阈值，V_reset 表示触发后的复位值，tau 为时间常数，tau_ref 为不应期的持续时间。方法是指在模拟中使用的数值积分方法。
-那么这两组之间的突触连接可以定义如下：
+## create synapse
 ```python
 d = bpl.synapses.Exponential(a, b, bp.conn.FixedProb(0.4, seed=123), g_max=10, tau=5., delay_step=1)
 ```
-在这里，我们使用指数突触模型 (bpl.synapses.Exponential) 来模拟突触连接。在模型的参数中，前两个分别表示突触前和突触后神经元组。第三个是指连接类型。在此示例中，我们使用 bp.conn.FixedProb，它以给定的概率将突触前神经元连接到突触后神经元（详细信息可在 Synaptic Connection 中获得）。以下三个参数描述了突触的动态特性，最后一个是 LIF 模型中的数值积分方法。
 
-## 构建网络
-定义完所有组件后，就可以组合成一个网络：
+## construct network
+
 ```python
 net = bpl.Network(a, b, d)
 net.build()
 ```
 
-## 增加输入
+## add input
 
-增加电流输入
+add current input
 ```python
 inputs = [bpl.device.Input(a, 20), bpl.device.Input(b, 10)]
 ```
 
-## 增加脉冲监测
+## add spike monitor
 ```python
 monitor_spike = bpl.device.Monitor([a, b], bpl.device.MonitorKey.spike)
 ```
 
-## 增加电压监测
+## add volt monitor
 ```python
 monitor_volt = bpl.device.Monitor([b], bpl.device.MonitorKey.volt)
 ```
 
-脉冲和电压监测合并到一个List：
 ```python
 monitors = [monitor_spike, monitor_volt]
 ```
 
-## 增加脉冲和电压回调函数
+## add spike and volt callback
 
 ```python
 def spike(a: List[Tuple[int, float]]):
@@ -78,8 +74,7 @@ def volt(a: List[Tuple[int, float, float]]):
   pass
 ```
 
-## 运行网络
-构建 SNN 后，我们可以将其用于动态模拟。要运行模拟，我们需要先将网络模型包装到运行器中,用户可以按如下方式初始DSRunner：
+## Run
 
 ```python
 runner = bpl.runner.DSRunner(
@@ -92,9 +87,9 @@ runner = bpl.runner.DSRunner(
 )
 runner.run(10.)
 ```
-其中调用函数接收模拟时间（通常以毫秒为单位）作为输入。 
+ 
 
-##　可视化
+##　visualization
 ```python
 import matplotlib.pyplot as plt
 
